@@ -1,5 +1,8 @@
 # Remaining tasks for stand-alone plug-in probabilistic evaluation
 
+First steps of implementation would only be valid to replace PTV by a set of scenarios,
+scenarios of GTV extensions to replace CTV will be implemented at a later stage.
+
 ### Framework tasks
 - [ ] Define license (e.g. MIT, Apache 2.0, GPLv3) !!
 - [ ] Define core classes and data structures based on OpenTPS
