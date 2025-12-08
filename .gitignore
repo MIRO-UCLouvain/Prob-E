@@ -1,0 +1,6 @@
+# Git ingore to ensure sensitive or unnecessary files are not tracked
+
+*.DS_Store
+*.dcm
+*.nii
+*.nii.gz
