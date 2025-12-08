@@ -26,10 +26,11 @@ scenarios of GTV extensions to replace CTV will be implemented at a later stage.
 - [ ] Boolean evaluation of DVH metrics for a given scenario
     - [ ] Dose metrics
     - [ ] Volume metrics
-- [ ] Distribution of DVH metrics over all scenarios
+- [ ] Probability of achieving clinical goals
     - [ ] Dose metrics
     - [ ] Volume metrics
-- [ ] Probability of achieving clinical goals
+#### Box plots / distribution plots
+- [ ] Distribution of DVH metrics over all scenarios
     - [ ] Dose metrics
     - [ ] Volume metrics
 #### DVH bands and DEVH
