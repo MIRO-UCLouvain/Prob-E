@@ -1,0 +1,58 @@
+import numpy as np
+
+from ._clinicalGoal import AbstractClinicalGoal
+
+
+class DXClinicalGoal(AbstractClinicalGoal):
+    """
+    A class to represent a Dose-Volume Percentage Clinical Goal (DX) for radiation therapy evaluation.
+
+    Attributes
+    ----------
+    prescription : float
+        The prescribed dose value for the clinical goal.
+    mask : np.ndarray
+        A binary mask defining the region of interest for the clinical goal.
+    lower_is_better : bool
+        Indicates if lower dose values are better for this goal.
+    volume : float
+        The volume (in %, e.g. 0.5 for 50%) associated with the clinical goal.
+    """
+
+    def __init__(self, prescription: float, mask: np.ndarray, lower_is_better: bool = True, **kwargs):
+        super().__init__(prescription, mask, lower_is_better)
+        self._volume = kwargs.get('volume', None)  # Volume in cc
+        if self._volume is None:
+            raise ValueError("Volume must be provided for DX ClinicalGoal.")
+        if self._volume <= 0:
+            raise ValueError("Volume must be a positive value.")
+        if self._volume > 1:
+            raise ValueError("Volume must be given in percentage (0-1).")
+
+    @property
+    def volume(self) -> float:
+        return self._volume
+
+    @volume.setter
+    def volume(self, newVolume: float):
+        if newVolume <= 0:
+            raise ValueError("Volume must be a positive value.")
+        if newVolume > 1:
+            raise ValueError("Volume must be given in percentage (0-1).")
+        self._volume = newVolume
+
+    def compute_value(self, dvh) -> float:
+        """
+        Compute the dose corresponding to the specified volume from the DVH.
+        Parameters
+        ----------
+        dvh : DVH
+            The dose-volume histogram object used for computation.
+
+        Returns
+        -------
+        float
+            The computed dose value corresponding to the specified volume.
+        """
+        value = dvh.computeDx(self.volume)
+        return value
