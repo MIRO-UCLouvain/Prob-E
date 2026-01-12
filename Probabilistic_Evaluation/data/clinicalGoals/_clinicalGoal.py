@@ -32,6 +32,8 @@ class AbstractClinicalGoal(ABC):
         self._lower_is_better: bool = lower_is_better
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
+        self._passingRate: float = None
+        self._cummulative_passingRate: float = None
 
     @property
     def prescription(self) -> float:
@@ -76,6 +78,15 @@ class AbstractClinicalGoal(ABC):
     @maskName.setter
     def maskName(self, newMaskName: str):
         self._maskName = newMaskName
+
+    @passingRate.setter
+    def SetPassingRate(self, passingRate: float):
+        self._passingRate = passingRate
+    
+    @_cummulative_passingRate.setter
+    def SetCummulative_passingRate(self, cummulative_passingRate: float):
+        self._cummulative_passingRate = cummulative_passingRate
+
 
     @abstractmethod
     def __str__(self):
