@@ -1,0 +1,11 @@
+[tool.poetry]
+name = "rt-probabilistic-evaluation"
+version = "0.1.0"
+description = "A package for probabilistic evaluation in radiation therapy"
+authors = ["Matijs Geerts","Romain Schyns","Eliot Peeters"]
+
+[tool.poetry.dependencies]
+python = "3.12"
+numpy = "^1.26.4"
+matplotlib = "^3.8.0"
+

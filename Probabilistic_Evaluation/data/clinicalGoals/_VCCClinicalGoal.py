@@ -36,6 +36,13 @@ class VCCClinicalGoal(AbstractClinicalGoal):
             raise ValueError("Dose must be a non-negative value.")
         self._dose = newDose
 
+    def __str__(self):
+        if self.lower_is_better:
+            comparison = "<="
+        else:
+            comparison = ">="
+        return f"V{self.dose}%{comparison}{self.prescription:.2f}cc"
+
     def compute_value(self, dvh) -> float:
         """
         Compute the dose corresponding to the specified volume from the DVH.

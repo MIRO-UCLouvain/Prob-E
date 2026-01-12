@@ -19,6 +19,12 @@ class DMinClinicalGoal(AbstractClinicalGoal):
     def __init__(self, prescription: float, mask: np.ndarray, lower_is_better: bool = False, **kwargs):
         super().__init__(prescription, mask, lower_is_better)
 
+    def __str__(self):
+        if self.lower_is_better:
+            comparison = "<="
+        else:
+            comparison = ">="
+        return f"DMIN{comparison}{self.prescription}"
 
     def compute_value(self, dvh) -> float:
         """
