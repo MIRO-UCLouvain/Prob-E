@@ -1,17 +1,18 @@
 from abc import ABC, abstractmethod
 
 class AbstractUncertaintyModel(ABC):
-    def __init__(self):
-        """
-        Abstract base class for uncertainty models.
+    """
+    Abstract base class for uncertainty models.
 
-        Attributes
-        ----------
-        name : str
-            The name of the uncertainty model.
-        parameters : dict
-            A dictionary to hold model parameters.
-        """
+    Attributes
+    ----------
+    name : str
+        The name of the uncertainty model.
+    parameters : dict
+        A dictionary to hold model parameters.
+    """
+
+    def __init__(self):
         super().__init__()
         self.name: str = "AbstractUncertaintyModel"
         self.parameters: dict = {}
