@@ -77,7 +77,7 @@ class Scenario(object):
 
     def computeGoalValues(self):
         for structName in self._patientData.clinicalGoalsDict.keys():
-            dvh = DVH(self._doseImageScenario, {structName: self._patientData.maskDict[structName]})
+            dvh = DVH(self._doseImageScenario, self._patientData.maskDict[structName])
             for goal in self._patientData.clinicalGoalsDict[structName]:
                 value = goal.compute_value(dvh)
                 achieved = goal.achieved
