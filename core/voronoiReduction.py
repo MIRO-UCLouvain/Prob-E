@@ -35,8 +35,20 @@ class VoronoiCells(Voronoi):
             Calculate Voronoi cell probabilities analytically.
     
     """
-    def __init__(self, points, method = 'analytical'):
+    def __init__(self, limit, spacing, method = 'analytical'):
+        limitX = np.round(limit / spacing[0])
+        limitY = np.round(limit / spacing[1])
+        limitZ = np.round(limit / spacing[2])
+        limit_rangeX = np.arange(-limitX, limitX+1)
+        limit_rangeY = np.arange(-limitY, limitY+1)
+        limit_rangeZ = np.arange(-limitZ, limitZ+1)
+        print(limit_rangeX)
+        print(limit_rangeZ)
+        XX,YY,ZZ = np.meshgrid(limit_rangeX, limit_rangeY, limit_rangeZ)
+        points = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
+        print("Generated points {} for Voronoi Cells with spacing: {}".format(points.shape[0], spacing))
         super().__init__(points)
+        self.spacing = spacing
         self.probabilitiesMC = None
         self.probabilities_analytical = None
         if method == 'montecarlo':
@@ -52,7 +64,11 @@ class VoronoiCells(Voronoi):
         # Monte Carlo simulation to estimate Voronoi cell probabilities
         MCsamples = int(1e6)
         counter = np.zeros(len(self.points)+1)
-        MCpoints = np.random.normal(0, sigma, (MCsamples, 3))
+        #MCpoints = np.random.normal(0, sigma, (MCsamples, 3))
+        MCpointsX = np.random.normal(0, sigma, MCsamples) / self.spacing[0]
+        MCpointsY = np.random.normal(0, sigma, MCsamples) / self.spacing[1]
+        MCpointsZ = np.random.normal(0, sigma, MCsamples) / self.spacing[2]
+        MCpoints = np.vstack([MCpointsX, MCpointsY, MCpointsZ]).T
         tree = cKDTree(self.points)
         dists, locations = tree.query(MCpoints, k=1)
         for loc in locations:
@@ -66,9 +82,12 @@ class VoronoiCells(Voronoi):
         probabilities_analytical = []
         for point in self.points:
             x, y, z = point
-            integral_x = intergral_gaussian_1D(x - 0.5, x + 0.5, mu=0, sigma=sigma)
-            integral_y = intergral_gaussian_1D(y - 0.5, y + 0.5, mu=0, sigma=sigma)
-            integral_z = intergral_gaussian_1D(z - 0.5, z + 0.5, mu=0, sigma=sigma)
+            x = x * self.spacing[0]
+            y = y * self.spacing[1]
+            z = z * self.spacing[2]
+            integral_x = intergral_gaussian_1D(x - self.spacing[0]/2, x + self.spacing[0]/2, mu=0, sigma=sigma)
+            integral_y = intergral_gaussian_1D(y - self.spacing[1]/2, y + self.spacing[1]/2, mu=0, sigma=sigma)
+            integral_z = intergral_gaussian_1D(z - self.spacing[2]/2, z + self.spacing[2]/2, mu=0, sigma=sigma)
             prob = integral_x * integral_y * integral_z
             probabilities_analytical.append(prob)
 
@@ -80,24 +99,49 @@ class VoronoiCells(Voronoi):
     
 def TestVoronoiCells(limit, sigma=1.6, plot=True):
     # Generate random points
-    limit_range = np.arange(-(limit), limit+1)
-    XX,YY,ZZ = np.meshgrid(limit_range, limit_range, limit_range)
-    points = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
-    print(f"Generated {points.shape} points for Voronoi diagram.")
-    
+    spacing = (1.0, 1.0, 2.0)
     # Create Voronoi cells
-    voronoi_cells = VoronoiCells(points, method='both')
+    voronoi_cells = VoronoiCells(limit, spacing, method='both')
 
     # Monte Carlo simulation to estimate Voronoi cell probabilities
     probabilitiesMC = voronoi_cells.probabilitiesMC
     #analytical probabilities
     probabilities_analytical = voronoi_cells.probabilities_analytical
     vor_points = voronoi_cells.points
-
+    
+    print("Voronoi Points and Analytical Probabilities:\n")
+    print("vor_ponts.shape:", vor_points.shape)
+    print("probabilities_analytical.shape:", probabilities_analytical.shape)
+    points_probabilities = np.hstack((vor_points, probabilities_analytical.reshape(-1, 1)))
+    # sort by probabilities
+    points_probabilities = points_probabilities[np.argsort(points_probabilities[:, 3])[::-1]]
+    #take the proabibilities needed to reach 95% of cumulative probability
+    cumulative_prob = np.cumsum(points_probabilities[:, 3])
+    num_cells_95 = np.searchsorted(cumulative_prob, 0.95,side='right') + 1
+    threshold_95 = points_probabilities[num_cells_95-1,3]
+    cumulative_prob95 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_95])
+    print(f"Number of Voronoi cells to reach 95% cumulative probability: {len(cumulative_prob95)} and the minimum probability of a scenario to be included: {threshold_95}")
+    num_cells_97 = np.searchsorted(cumulative_prob, 0.97,side='right') + 1
+    threshold_97 = points_probabilities[num_cells_97-1,3]
+    cumulative_prob97 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_97])
+    print(f"Number of Voronoi cells to reach 97% cumulative probability: {len(cumulative_prob97)} and the minimum probability of a scenario to be included: {threshold_97}")
+    num_cells_99 = np.searchsorted(cumulative_prob, 0.99,side='right') + 1
+    threshold_99 = points_probabilities[num_cells_99-1,3]
+    cumulative_prob99 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_99])
+    print(f"Number of Voronoi cells to reach 99% cumulative probability: {len(cumulative_prob99)} and the minimum probability of a scenario to be included: {threshold_99}")
+    num_cells_9999 = np.searchsorted(cumulative_prob, 0.9999,side='right') + 1
+    threshold_9999 = points_probabilities[num_cells_9999-1,3]
+    cumulative_prob9999 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_9999])
+    print(f"Number of Voronoi cells to reach 99.99% cumulative probability: {len(cumulative_prob9999)} and the minimum probability of a scenario to be included: {threshold_9999}")
+   
     # Plotting
     if plot:
         plt.plot(probabilitiesMC,label='Monte Carlo',color='red')
-        plt.plot(probabilities_analytical, label='Analytical',color='blue', linestyle='dashed')
+        plt.plot(probabilities_analytical, label='Analytical',color='blue', linestyle='dashed') #marker = '.')
+        plt.hlines(y=points_probabilities[num_cells_95-1,3], xmin=0, xmax=len(probabilities_analytical), colors='green', linestyles='dotted', label='95% Cumulative Probability Threshold')
+        plt.hlines(y=points_probabilities[num_cells_97-1,3], xmin=0, xmax=len(probabilities_analytical), colors='orange', linestyles='dotted', label='97% Cumulative Probability Threshold')
+        plt.hlines(y=points_probabilities[num_cells_99-1,3], xmin=0, xmax=len(probabilities_analytical), colors='purple', linestyles='dotted', label='99% Cumulative Probability Threshold')
+        plt.hlines(y=points_probabilities[num_cells_9999-1,3], xmin=0, xmax=len(probabilities_analytical), colors='brown', linestyles='dotted', label='99.99% Cumulative Probability Threshold')
         plt.xlabel('Voronoi Cell Index')
         plt.ylabel('Probability')
         plt.title('Voronoi Cell Probabilities: Monte Carlo vs Analytical')
@@ -107,7 +151,7 @@ def TestVoronoiCells(limit, sigma=1.6, plot=True):
 if __name__ == "__main__":
 
     PTVmargin = 5
-    limit = 5
+    limit = 2*PTVmargin
     TestVoronoiCells(limit,sigma=PTVmargin/(3.2),plot = True)
 
     # resol = 10
