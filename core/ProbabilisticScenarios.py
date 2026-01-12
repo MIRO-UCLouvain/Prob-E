@@ -1,5 +1,6 @@
 import numpy as np  
 from VoronoiCells import VoronoiCells
+import data.PatientData as PatientData
 
 class ProbabilisticScenarios:
     """
@@ -22,7 +23,7 @@ class ProbabilisticScenarios:
         evaluate_scenario(doseImage=None):
             Evaluate the scenario based on the shifted dose image.
     """
-    def __init__(self,ctImage,doseImage,targetMask,max_displacement=5):
+    def __init__(self,patientData:PatientData,max_displacement=5):
         """
         Docstring for __init__
         
@@ -32,9 +33,9 @@ class ProbabilisticScenarios:
         :param targetMask: Description
         :param max_displacement: Description
         """
-        self.ctImage = ctImage
-        self.doseImage = doseImage
-        self.targetMask = targetMask
+        self.ctImage = patientData.get_ct_image()
+        self.doseImage = patientData.get_dose_image()
+        self.targetMask = patientData.get_target_mask()
         self.displacements = np.arange(-max_displacement, max_displacement+1, 1)  # Example displacement range from -5 to 5
         self.points = self.generate_scenario_points()
         self.voronoi_cells = VoronoiCells(self.points) 
