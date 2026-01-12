@@ -1,5 +1,4 @@
 import numpy as np
-from RT_Probabilistic_Evaluation.data import ClinicalGoal
 
 class PatientData:
     """
