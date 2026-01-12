@@ -1,6 +1,9 @@
+import sys
+sys.path.append('.')
+
 import numpy as np  
-from VoronoiCells import VoronoiCells
-import data.PatientData as PatientData
+from voronoiReduction import VoronoiCells
+from data.PatientData import PatientData
 
 class ProbabilisticScenarios:
     """
@@ -13,6 +16,7 @@ class ProbabilisticScenarios:
         displacements (list): List of possible displacements in each dimension.
         points (ndarray): The generated scenario points.
         voronoi_cells (VoronoiCells): Voronoi cells object for scenario probabilities.
+    
     Methods:
         generate_scenario_points():
             Generate scenario points based on displacements.
@@ -24,24 +28,17 @@ class ProbabilisticScenarios:
             Evaluate the scenario based on the shifted dose image.
     """
     def __init__(self,patientData:PatientData,max_displacement=5):
-        """
-        Docstring for __init__
-        
-        :param self: Description
-        :param ctImage: Description
-        :param doseImage: Description
-        :param targetMask: Description
-        :param max_displacement: Description
-        """
+
         self.ctImage = patientData.get_ct_image()
         self.doseImage = patientData.get_dose_image()
         self.targetMask = patientData.get_target_mask()
+        self.spacing = patientData.get_spacing()
         self.displacements = np.arange(-max_displacement, max_displacement+1, 1)  # Example displacement range from -5 to 5
         self.points = self.generate_scenario_points()
-        self.voronoi_cells = VoronoiCells(self.points) 
+        self.voronoi_cells = VoronoiCells(self.points,self.spacing) 
 
     def generate_scenario_points(self):
-        XX,YY,ZZ = np.meshgrid(self.displacements, self.displacements, self.displacements)
+        XX,YY,ZZ = np.meshgrid(self.displacements/self.spacing[0], self.displacements/self.spacing[1], self.displacements/self.spacing[2])
         points = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
         return points
         
@@ -77,8 +74,11 @@ def test_probabilistic_scenarios():
     doseImage[20:30,20:30,20:30] = 50  # Example dose distribution
     targetMask = np.zeros((50,50,50),dtype=bool)  # Example target mask
     targetMask[22:28,22:28,22:28] = True  # Define target region
+    spacing = (1.0, 1.0, 5.0)  # Example spacing
 
-    ps = ProbabilisticScenarios(ctImage, doseImage, targetMask, max_displacement=5)
+    patientData = PatientData(ctImage, doseImage, targetMask, spacing=spacing)
+
+    ps = ProbabilisticScenarios(patientData, max_displacement=5)
     results = ps.compute_scenarios()
     
     # print("Evaluation results for all scenarios:", results)
@@ -99,7 +99,7 @@ def test_probabilistic_scenarios():
     for i, point in enumerate(ps.points):
         if point.tolist() == [0,0,0]:
             print(f"Scenario {i}: Displacement {point}, Evaluation Metric: {results[i]}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
-        if point.tolist() == [4,4,4]:
+        if point.tolist() == [5,5,1]:
             print(f"Scenario {i}: Displacement {point}, Evaluation Metric: {results[i]}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
             shifted_dose = ps.shift_dose_image(ps.doseImage, shift=point)
             plt.imshow(shifted_dose[:,:,25], cmap='jet')
