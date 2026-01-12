@@ -51,7 +51,27 @@ class ProbabilisticEvaluator:
             #1. absolute
             self.clinical_goals[goal_name].SetCummulative_passingRate(cummul_PR)
             #2. relative
-            self.clinical_goals[goal_name].SetCummulative_passingRate(cummul_PR / cummul_PR_prev)
+            #self.clinical_goals[goal_name].SetCummulative_passingRate(cummul_PR / cummul_PR_prev)
 
             cummul_PR_prev = cummul_PR
             i+=1  
+
+    #Next three functions assume that all (displaced) dose images have the same shape
+    def voxelwise_min_map(self):
+        """
+        Compute voxel-wise minimum dose map across all scenarios.
+        """
+        dose_maps = [s.doseImageScenario for s in self.scenarios]
+        min_map = np.minimum.reduce(dose_maps)
+        return min_map
+    
+    def voxelwise_max_map(self):
+        """
+        Compute voxel-wise maximum dose map across all scenarios.
+        """
+        dose_maps = [s.doseImageScenario for s in self.scenarios]
+        max_map = np.maximum.reduce(dose_maps)
+        return max_map
+    
+    def prob_dose_map(self):
+        return np.sum([s.doseImageScenario * s.scenarioProbability for s in self.scenarios], axis=0)
