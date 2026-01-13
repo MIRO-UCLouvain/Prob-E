@@ -133,7 +133,8 @@ class AbstractClinicalGoal(ABC):
 
         Parameters
         ----------
-        dvh
+        dvh : DVH
+            The Dose-Volume Histogram of the scenario.
 
         Returns
         -------
