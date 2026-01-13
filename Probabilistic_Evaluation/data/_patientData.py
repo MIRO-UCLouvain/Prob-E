@@ -15,7 +15,7 @@ class PatientData:
     clinicalGoalsDict : dict
         A dictionary where keys are structure names (str) and values are lists of ClinicalGoal objects for those structures.
     """
-    def __init__(self, ctImage: np.ndarray, doseImage: np.ndarray, maskDict: dict):
+    def __init__(self, ctImage: np.ndarray, doseImage: np.ndarray, maskDict: dict, spacing: tuple):
         # check matrix dimensions matches
         if ctImage.shape != doseImage.shape:
             raise ValueError("CT image and dose image must have the same dimensions.")

@@ -43,7 +43,7 @@ class DicomReader():
 
         self.RTDOSE = self.readRTDOSE()
         self.RTSTRUCT = self.readRTSTRUCT()
-        print(self.RTSTRUCT)
+    
 
 
         # CTImage = readDicomCT(directory)
@@ -87,6 +87,6 @@ class DicomReader():
         raise ValueError("No RTStruct found in the provided DICOM series.")
 
 if __name__ == "__main__":
-    dicomDir = r"C:\Users\rschyns\OneDrive - UCL\Job MIRO\OpenTPS\dataset_testing\Plan_UCL7"
+    dicomDir = r"your path"
     reader = DicomReader()
     reader.load_dicom_series(dicomDir)
