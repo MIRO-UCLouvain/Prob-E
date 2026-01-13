@@ -56,11 +56,16 @@ class VoronoiCells(Voronoi):
         self.probabilities_analytical = None
         if method == 'montecarlo':
             self.probabilitiesToVoronoiCellsMC()
+            self.probabilities = self.probabilitiesMC
         elif method == 'analytical':
             self.probabilitiesToVoronoiCellsAnalytical()
+            self.probabilities = self.probabilities_analytical
         elif method == 'both':
             self.probabilitiesToVoronoiCellsMC()
             self.probabilitiesToVoronoiCellsAnalytical()
+            self.probabilities = self.probabilities_analytical
+        else:
+            raise ValueError("Method must be 'montecarlo', 'analytical' or  'both'.")
 
 
     def probabilitiesToVoronoiCellsMC(self, sigma=1.6):

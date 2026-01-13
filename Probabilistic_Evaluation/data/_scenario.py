@@ -45,5 +45,8 @@ class Scenario(object):
 
     def compute_shifted_image(self,displacement: np.ndarray) -> np.ndarray:
         shift_x, shift_y, shift_z = displacement
-        self.doseImageScenario = shift_dose_image(self.doseImage, shift=(shift_x, shift_y, shift_z))
+        self._doseImage = shift_dose_image(self._doseImage, shift=(shift_x, shift_y, shift_z))
+
+    def delete_doseImage(self):
+        self._doseImage = None
 
