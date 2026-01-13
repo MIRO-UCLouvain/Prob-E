@@ -10,10 +10,18 @@ class VCCClinicalGoal(AbstractClinicalGoal):
     ----------
     prescription : float
         The prescribed absolute volume (in CC) for the clinical goal.
-    mask : np.ndarray
-        A binary mask defining the region of interest for the clinical goal.
+    value : float
+        The evaluated value for the clinical goal.
     lower_is_better : bool
-        Indicates if lower volume values are better for this goal.
+        Indicates if lower values are better for this goal.
+    mask : np.ndarray
+        The mask defining the region of interest for the clinical goal.
+    maskName : str
+        The name of the mask defining the region of interest for the clinical goal.
+    valueList : list
+        A list to store list of values computed for the clinical goal on each scenario.
+    successList : list
+        A list to store success status for each scenario.
     dose : float
         The dose (in Gy) associated with the clinical goal.
     """
@@ -41,7 +49,7 @@ class VCCClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"V{self.dose}%{comparison}{self.prescription:.2f}cc"
+        return f"{self.maskName}:V{self.dose}%{comparison}{self.prescription:.2f}cc"
 
     def compute_value(self, dvh) -> float:
         """

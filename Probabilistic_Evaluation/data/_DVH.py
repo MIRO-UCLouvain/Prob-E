@@ -22,8 +22,8 @@ class DVH(object):
         The maximum dose within the masked region.
     DMean : float
         The mean dose within the masked region.
-    spacing : np.ndarray
-        The voxel spacing in each dimension in mm in [x, y, z] order.
+    spacing : tuple (default=(1.0, 1.0, 1.0))
+        A tuple representing the voxel spacing in each dimension (x, y, z).
 
     Methods
     -------
@@ -35,15 +35,20 @@ class DVH(object):
         Computes the volume percentage receiving at least x Gy dose.
     """
 
-    def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0,spacing: np.ndarray = np.array([1.0,1.0,1.0])):
+    def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0, spacing: tuple = (1.0, 1.0, 1.0)):
         self._dosemap = dosemap
         self._mask = mask
         self._bin_dose = None  # Store bin doses for Dx and Vx calculations, makes Dx calculations easier
         self._dvh = None
         self._maxDVH = max_DVH
-        self._Dmin = None
-        self._Dmax = None
-        self._Dmean = None
+        dmin = np.min(self.dosemap[self.mask.astype(bool)])
+        self._DMin = dmin
+        dmax = np.max(self.dosemap[self.mask.astype(bool)])
+        self._DMax = dmax
+        self.DMax
+        dmean = np.mean(self.dosemap[self.mask.astype(bool)])
+        self._Dmean = dmean
+        self.DMean
         self._spacing = spacing
 
     @property
@@ -51,7 +56,7 @@ class DVH(object):
         return self._dosemap
 
     @dosemap.setter
-    def dosemap(self, newDosemap: np.ndarray):
+    def dosemap(self, newDosemap):
         self._dosemap = newDosemap
 
     @property
@@ -82,9 +87,6 @@ class DVH(object):
 
     @property
     def DMin(self) -> float:
-        if self._Dmin is None:
-            dmin = np.min(self.dosemap[self.mask.astype(bool)])
-            self._Dmin = dmin
         return self._Dmin
 
     @DMin.setter
@@ -95,9 +97,6 @@ class DVH(object):
 
     @property
     def DMax(self) -> float:
-        if self._Dmax is None:
-            dmax = np.max(self.dosemap[self.mask.astype(bool)])
-            self._Dmax = dmax
         return self._Dmax
 
     @DMax.setter
@@ -108,9 +107,6 @@ class DVH(object):
 
     @property
     def DMean(self) -> float:
-        if self._Dmean is None:
-            dmean = np.mean(self.dosemap[self.mask.astype(bool)])
-            self._Dmean = dmean
         return self._Dmean
 
     @DMean.setter
@@ -120,11 +116,11 @@ class DVH(object):
         self._Dmean = newDMean
 
     @property
-    def spacing(self) -> list[float]:
+    def spacing(self) -> tuple:
         return self._spacing
 
     @spacing.setter
-    def spacing(self, newSpacing: list[float]):
+    def spacing(self, newSpacing: tuple):
         if len(newSpacing) != 3:
             raise ValueError("Spacing must be a list of three float values.")
         if any(s <= 0 for s in newSpacing):
@@ -149,6 +145,7 @@ class DVH(object):
         dvh = dvh / np.sum(hist) * 100.0  # Normalize to percentage
         self._bin_dose = (bin_edges[:-1] + bin_edges[1:]) / 2.0  # dose at midpoints of bins
         self._dvh = dvh
+        self._dosemap = None  # free memory
 
     def computeDx(self, x: float) -> float:
         """

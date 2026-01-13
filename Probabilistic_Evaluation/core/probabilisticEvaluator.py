@@ -11,13 +11,32 @@ class ProbabilisticEvaluator:
         self.scenarios = scenarios
         self.clinical_goals = self.scenarios[0].patientData.clinicalGoalsDict 
         self.priority_list = priority_list #assume list with names of clinical goals in order of priority
+        
+        
+        
+    def evaluate_all_scenarios(self):
+        """
+        Evaluate all scenarios and compute clinical goal values + Passing Rate.
+        """
+        for scenario in self.scenarios:
+            scenario.computeGoalValues()
         for goal in self.clinical_goals.keys():
             PR = 0
-            for s in scenarios:
+            for s in self.scenarios:
                 if s.clinicalGoalsValuesAchieved[goal]:
                     PR += s.scenarioProbability
                 
             self.clinical_goals[goal].SetPassingRate(PR) #need passing rate attribute in clinical goal class
+    
+    
+    def evaluate_scenario(self, scenario:Scenario):
+        """
+        Basically a wrapper for the computeGoalValues method in Scenario class
+        that returns the clinical goal values for a given scenario.
+
+        """
+        scenario.computeGoalValues()
+        return scenario.clinlicalGoalsValues
 
     def passingRate_table(self):
         """

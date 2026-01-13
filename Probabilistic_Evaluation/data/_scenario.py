@@ -1,6 +1,4 @@
 import numpy as np
-from ._patientData import PatientData
-from ._DVH import DVH
 from Probabilistic_Evaluation.utils import *
 
 
@@ -8,89 +6,44 @@ class Scenario(object):
     """
     A class to represent a clinical scenario for radiation therapy evaluation.
 
+    Attributes
+    ----------
+    displacement : np.ndarray
+        The displacement vector for the scenario.
+    probability : float
+        The probability of occurrence for the scenario.
+    doseImage : np.ndarray
+        The dose distribution image for the scenario.
     """
 
-    def __init__(self, doseImageScenario: np.ndarray, patientData: PatientData):
-        self.doseImageScenario = doseImageScenario
-        self._patientData = patientData
-        self._scenarioDisplacement: np.ndarray = None
-        self._scenarioProbability: float = None
-        self._clinicalGoalsValues: dict = {}
-        self._clinicalGoalsValuesAchieved: dict = {}
+    def __init__(self, displacement: np.ndarray, probability: float):
+        self._displacement: np.ndarray = displacement
+        self._probability: float = probability
+        self._doseImage = None
 
     @property
-    def doseImageScenario(self) -> np.ndarray:
-        return self._doseImageScenario
+    def doseImage(self) -> np.ndarray:
+        return self._doseImage
 
-    @doseImageScenario.setter
-    def doseImageScenario(self, newDoseImageScenario: np.ndarray):
-        self._doseImageScenario = newDoseImageScenario
-
-    @property
-    def patientData(self) -> PatientData:
-        return self._patientData
-
-    @patientData.setter
-    def patientData(self, newPatientData: PatientData):
-        self._patientData = newPatientData
+    @doseImage.setter
+    def doseImage(self, newDoseImage: np.ndarray):
+        self._doseImage = newDoseImage
 
     @property
-    def displacementScenario(self) -> np.ndarray:
-        return self._displacementScenario
-
-    @displacementScenario.setter
-    def displacementScenario(self, newDisplacementScenario: np.ndarray):
-        self._displacementScenario = newDisplacementScenario
+    def displacement(self) -> np.ndarray:
+        return self._displacement
 
     @property
-    def clinlicalGoalsValues(self) -> dict:
-        return self._clinlicalGoalsValues
+    def probability(self) -> float:
+        return self._probability
 
-    @clinlicalGoalsValues.setter
-    def clinlicalGoalsValues(self, newClinlicalGoalsValues: dict):
-        self._clinlicalGoalsValues = newClinlicalGoalsValues
-
-    @property
-    def clinicalGoalsValuesAchieved(self) -> dict:
-        return self._clinicalGoalsValuesAchieved
-
-    @clinicalGoalsValuesAchieved.setter
-    def clinicalGoalsValuesAchieved(self, newClinicalGoalsValuesAchieved: dict):
-        self._clinicalGoalsValuesAchieved = newClinicalGoalsValuesAchieved
-
-    @property
-    def scenarioProbability(self) -> float:
-        return self._scenarioProbability
-
-    @scenarioProbability.setter
-    def scenarioProbability(self, newScenarioProbability: float):
-        if newScenarioProbability < 0 or newScenarioProbability > 1:
+    @probability.setter
+    def probability(self, newProbability: float):
+        if newProbability < 0 or newProbability > 1:
             raise ValueError("Scenario probability must be between 0 and 1.")
-        self._scenarioProbability = newScenarioProbability
-
-    @property
-    def doseImageScenario(self) -> np.ndarray:
-        return self._doseImageScenario
-
-    @doseImageScenario.setter
-    def doseImageScenario(self, newDoseImageScenario: np.ndarray):
-        self._doseImageScenario = newDoseImageScenario
-
-    def computeGoalValues(self):
-        used_masks = set(self._patientData.clinicalGoalsDict.values()[i].maskName for i in range(len(self._patientData.clinicalGoalsDict)))
-        for name in used_masks:
-            dvh = DVH(self._doseImageScenario, self._patientData.maskDict[name])
-            for goal in self._patientData.clinicalGoalsDict.values():
-                if goal.maskName != name:
-                    continue
-                value = goal.compute_value(dvh)
-                achieved = goal.achieved
-                self._clinicalGoalsValues[goal.__str__()] = value
-                self._clinicalGoalsValuesAchieved[goal.__str__()] = achieved
+        self._probability = newProbability
 
     def compute_shifted_image(self,displacement: np.ndarray) -> np.ndarray:
-        for point in self.points:
-            shift_x, shift_y, shift_z = point
-            self.doseImageScenario = shift_dose_image(self.doseImage, shift=(shift_x, shift_y, shift_z))
-
+        shift_x, shift_y, shift_z = displacement
+        self.doseImageScenario = shift_dose_image(self.doseImage, shift=(shift_x, shift_y, shift_z))
 

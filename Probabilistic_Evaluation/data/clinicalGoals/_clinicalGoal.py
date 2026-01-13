@@ -14,10 +14,14 @@ class AbstractClinicalGoal(ABC):
         The evaluated value for the clinical goal.
     lower_is_better : bool
         Indicates if lower values are better for this goal.
-    achieved : bool
-        Indicates if the goal has been achieved.
     mask : np.ndarray
         The mask defining the region of interest for the clinical goal.
+    maskName : str
+        The name of the mask defining the region of interest for the clinical goal.
+    valueList : list
+        A list to store list of values computed for the clinical goal on each scenario.
+    successList : list
+        A list to store success status for each scenario.
 
     Methods
     -------
@@ -32,8 +36,8 @@ class AbstractClinicalGoal(ABC):
         self._lower_is_better: bool = lower_is_better
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
-        self._passingRate: float = None
-        self._cummulative_passingRate: float = None
+        self.valueList: list = []
+        self.successList: list = []
 
     @property
     def prescription(self) -> float:
@@ -78,14 +82,6 @@ class AbstractClinicalGoal(ABC):
     @maskName.setter
     def maskName(self, newMaskName: str):
         self._maskName = newMaskName
-
-    @passingRate.setter
-    def SetPassingRate(self, passingRate: float):
-        self._passingRate = passingRate
-    
-    @_cummulative_passingRate.setter
-    def SetCummulative_passingRate(self, cummulative_passingRate: float):
-        self._cummulative_passingRate = cummulative_passingRate
 
 
     @abstractmethod

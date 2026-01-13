@@ -11,10 +11,18 @@ class DXClinicalGoal(AbstractClinicalGoal):
     ----------
     prescription : float
         The prescribed dose value for the clinical goal.
-    mask : np.ndarray
-        A binary mask defining the region of interest for the clinical goal.
+    value : float
+        The evaluated value for the clinical goal.
     lower_is_better : bool
-        Indicates if lower dose values are better for this goal.
+        Indicates if lower values are better for this goal.
+    mask : np.ndarray
+        The mask defining the region of interest for the clinical goal.
+    maskName : str
+        The name of the mask defining the region of interest for the clinical goal.
+    valueList : list
+        A list to store list of values computed for the clinical goal on each scenario.
+    successList : list
+        A list to store success status for each scenario.
     volume : float
         The volume (in %, e.g. 0.5 for 50%) associated with the clinical goal.
     """
@@ -46,7 +54,7 @@ class DXClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"D{self.volume*100:.1f}%{comparison}{self.prescription}"
+        return f"{self.maskName}:D{self.volume*100:.1f}%{comparison}{self.prescription}"
 
     def compute_value(self, dvh) -> float:
         """

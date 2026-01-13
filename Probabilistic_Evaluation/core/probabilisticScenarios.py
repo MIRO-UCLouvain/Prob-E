@@ -4,6 +4,7 @@ sys.path.append('.')
 import numpy as np  
 from voronoiReduction import VoronoiCells
 from Probabilistic_Evaluation.data._patientData import PatientData
+from Probabilistic_Evaluation.data._scenario import Scenario
 
 class ProbabilisticScenarios:
     """
@@ -28,14 +29,15 @@ class ProbabilisticScenarios:
             Evaluate the scenario based on the shifted dose image.
     """
     def __init__(self,patientData:PatientData,max_displacement=5):
-
-        self.ctImage = patientData.get_ct_image()
-        self.doseImage = patientData.get_dose_image()
-        self.targetMask = patientData.get_target_mask()
-        self.spacing = patientData.get_spacing()
+        self.patientData = patientData  
+        self.ctImage = self.patientData.get_ct_image()
+        self.doseImage = self.patientData.get_dose_image()
+        self.targetMask = self.patientData.get_target_mask()
+        self.spacing = self.patientData.get_spacing()
         self.displacements = np.arange(-max_displacement, max_displacement+1, 1)  # Example displacement range from -5 to 5
         self.points = self.generate_scenario_points()
-        self.voronoi_cells = VoronoiCells(self.points,self.spacing) 
+        self.voronoi_cells = VoronoiCells(self.points,self.spacing)
+        self.scenarios = [] 
 
     def generate_scenario_points(self):
         XX,YY,ZZ = np.meshgrid(self.displacements/self.spacing[0], self.displacements/self.spacing[1], self.displacements/self.spacing[2])
@@ -44,25 +46,27 @@ class ProbabilisticScenarios:
         
         
     def compute_scenarios(self):
-        results = []
+    
         for point in self.points:
             shift_x, shift_y, shift_z = point
             shifted_dose = self.shift_dose_image(self.doseImage, shift=(shift_x, shift_y, shift_z))
-            result = self.evaluate_scenario(shifted_dose)
-            results.append(result)
-        return results
-    
+            scenario = Scenario(patientData=self.patientData, spacing=self.spacing)
+            scenario.displacementScenario(point)
+            scenario.doseImageScenario(shifted_dose)
+            #input probability of scenario TODO
 
+            #next line replaces evaluate_scenario call so deleted the function
+            #maybe we want this in probabilisticEvaluator instead?, so you would be able
+            # to evaluate specific scenarios separately
+            scenario.computeGoalValues()
+
+            self.scenarios.append(scenario)
+            
+        return None
+    
     def shift_dose_image(self, doseImage, shift):
         shifted_dose = np.roll(doseImage, shift=shift, axis=(0, 1, 2))
         return shifted_dose
-    
-    def evaluate_scenario(self,doseImage=None):
-        shifted_dose = doseImage
-        doseInTarget = shifted_dose[self.targetMask > 0]
-        # Placeholder for actual evaluation logic
-        evaluation_metric = np.mean(doseInTarget)  # Example metric: mean dose
-        return evaluation_metric
     
 
 import matplotlib.pyplot as plt

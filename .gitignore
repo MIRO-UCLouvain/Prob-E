@@ -4,3 +4,4 @@
 *.dcm
 *.nii
 *.nii.gz
+demo/*
