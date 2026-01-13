@@ -42,8 +42,7 @@ class VoronoiCells(Voronoi):
         limit_rangeX = np.arange(-limitX, limitX+1)
         limit_rangeY = np.arange(-limitY, limitY+1)
         limit_rangeZ = np.arange(-limitZ, limitZ+1)
-        print(limit_rangeX)
-        print(limit_rangeZ)
+
         XX,YY,ZZ = np.meshgrid(limit_rangeX, limit_rangeY, limit_rangeZ)
         points = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
         print("Generated points {} for Voronoi Cells with spacing: {}".format(points.shape[0], spacing))
@@ -60,7 +59,7 @@ class VoronoiCells(Voronoi):
             self.probabilitiesToVoronoiCellsAnalytical()
 
 
-    def probabilitiesToVoronoiCellsMC(self,limit=6, sigma=1.6):
+    def probabilitiesToVoronoiCellsMC(self, sigma=1.6):
         # Monte Carlo simulation to estimate Voronoi cell probabilities
         MCsamples = int(1e6)
         counter = np.zeros(len(self.points)+1)
@@ -77,7 +76,7 @@ class VoronoiCells(Voronoi):
         self.probabilitiesMC = counter / MCsamples
         return self.probabilitiesMC
         
-    def probabilitiesToVoronoiCellsAnalytical(self,limit=6, sigma=1.6):
+    def probabilitiesToVoronoiCellsAnalytical(self, sigma=1.6):
         # Analytical calculation of Voronoi cell probabilities
         probabilities_analytical = []
         for point in self.points:
@@ -170,4 +169,3 @@ if __name__ == "__main__":
     # plt.title('2D Slice of 3D Gaussian Image')
     # plt.colorbar()
     # plt.show()
-
