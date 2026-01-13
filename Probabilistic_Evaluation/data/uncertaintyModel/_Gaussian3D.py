@@ -4,9 +4,11 @@ from scipy.special import erf
 
 from ._abstractUncertaintyModel import AbstractUncertaintyModel
 
+
 class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
     """
     A class to represent a 3D Gaussian uncertainty model.
+    ! ASSUMING INDEPENDENT DIMENSIONS !
 
     Attributes
     ----------
@@ -22,7 +24,8 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         - 'sigma_z': Standard deviation in z direction (default: 5/3.2)
     """
 
-    def __inti__(self, parameters: dict = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': 5/(3.2), 'sigma_y': 5/(3.2), 'sigma_z': 5/(3.2)}):
+    def __inti__(self, parameters: dict = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': 5 / (3.2), 'sigma_y': 5 / (3.2),
+                                           'sigma_z': 5 / (3.2)}):
         super().__init__()
         self.name: str = "Gaussian3DUncertaintyModel"
         self.parameters: dict = parameters
@@ -82,6 +85,35 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
 
         return cdf_x * cdf_y * cdf_z
 
+    def sample(self, n):
+        """
+        Generate n random samples from the 3D Gaussian uncertainty model.
+
+        Parameters
+        ----------
+        n : int
+            The number of samples to generate.
+
+        Returns
+        -------
+        ndarray
+            An array of shape (n, 3) containing n random samples.
+        """
+        mu_x = self.parameters['mu_x']
+        mu_y = self.parameters['mu_y']
+        mu_z = self.parameters['mu_z']
+        sigma_x = self.parameters['sigma_x']
+        sigma_y = self.parameters['sigma_y']
+        sigma_z = self.parameters['sigma_z']
+
+        mean = [mu_x, mu_y, mu_z]
+        cov = [[sigma_x ** 2, 0, 0],
+               [0, sigma_y ** 2, 0],
+               [0, 0, sigma_z ** 2]]
+
+        samples = np.random.multivariate_normal(mean, cov, n)
+        return samples
+
     def boundedIntegral(self, a, b):
         """
         Compute the integral of the 3D Gaussian function over the bounded region defined by a and b.
@@ -106,7 +138,6 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
             return integral_x * integral_y * integral_z
         else:
             raise NotImplementedError("Bounded integral for non-zero mean is not implemented yet.")
-
 
     def bounded1DIntegral(self, a, b, mu, sigma):
         """
