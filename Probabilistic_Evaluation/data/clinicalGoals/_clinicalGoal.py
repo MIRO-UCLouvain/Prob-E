@@ -27,6 +27,10 @@ class AbstractClinicalGoal(ABC):
     -------
     compute_value() -> float
         Abstract method to compute the value of the clinical goal.
+    compute_success(value) -> bool
+        Method to compute if the clinical goal is achieved based on the value.
+    compute(dvh) -> None
+        Method to compute the clinical goal value and success status based on the provided DVH.
     """
 
     def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
@@ -102,3 +106,40 @@ class AbstractClinicalGoal(ABC):
             The computed value of the clinical goal.
         """
         pass
+
+
+    def compute_success(self,value) -> bool:
+        """
+        Determine if the clinical goal is achieved based on the computed value.
+
+        Parameters
+        ----------
+        value : float
+            The computed value of the clinical goal.
+
+        Returns
+        -------
+        bool
+            True if the goal is achieved, False otherwise.
+        """
+        if self._lower_is_better:
+            return value <= self._prescription
+        else:
+            return value >= self._prescription
+
+    def compute(self,dvh) -> None:
+        """
+        Compute the clinical goal value and success status based on the provided DVH.
+
+        Parameters
+        ----------
+        dvh
+
+        Returns
+        -------
+        None
+        """
+        value = self.compute_value(dvh)
+        success = self.compute_success(value)
+        self.valueList.append(value)
+        self.successList.append(success)
