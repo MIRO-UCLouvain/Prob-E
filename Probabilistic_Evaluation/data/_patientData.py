@@ -17,6 +17,8 @@ class PatientData:
         A list of clinical goal objects associated with the patient.
     spacing : tuple (default=(1.0, 1.0, 1.0))
         A tuple representing the voxel spacing in each dimension (x, y, z).
+    scenarioList : list
+        A list of scenario objects associated with the patient.
 
     Methods
     -------
@@ -38,6 +40,7 @@ class PatientData:
         self._maskDict = maskDict
         self._clinicalGoalsList = []
         self._spacing = spacing
+        self.scenarioList = []
 
     @property
     def ctImage(self) -> np.ndarray:
