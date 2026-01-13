@@ -5,6 +5,7 @@ import numpy as np
 from scipy.spatial import Voronoi, cKDTree
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data.uncertaintyModel import Gaussian3DUncertaintyModel
+from sampling import *
 
 
 def gaussian3D(x, y, z, mu=0, sigma=3):
@@ -19,7 +20,7 @@ def intergral_gaussian_1D(a, b, mu=0, sigma=3):
     coeff = 0.5 * (erf((b - mu) / (sigma * np.sqrt(2))) - erf((a - mu) / (sigma * np.sqrt(2))))
     return coeff
 
-class VoronoiCells(Voronoi):
+class VoronoiCells(Voronoi, AbstractsamplingMethod):
     """
     A class to represent Voronoi cells and compute their probabilities
     based on Monte Carlo simulation and analytical methods (default is analytical).
@@ -48,12 +49,19 @@ class VoronoiCells(Voronoi):
         limit_rangeZ = np.arange(-limitZ, limitZ+1)
 
         XX,YY,ZZ = np.meshgrid(limit_rangeX, limit_rangeY, limit_rangeZ)
-        points = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
-        print("Generated points {} for Voronoi Cells with spacing: {}".format(points.shape[0], spacing))
-        super().__init__(points)
+        self.displacements = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
+        print("Generated points {} for Voronoi Cells with spacing: {}".format(self.displacements.shape[0], spacing))
+        super().__init__(self.displacements)
+        self.name = "VoronoiCells"
         self.spacing = spacing
         self.probabilitiesMC = None
         self.probabilities_analytical = None
+        self.probabilities = None
+
+        self.sample(method=method)
+
+        
+    def sample(self, method='analytical'):
         if method == 'montecarlo':
             self.probabilitiesToVoronoiCellsMC()
             self.probabilities = self.probabilitiesMC
@@ -67,17 +75,16 @@ class VoronoiCells(Voronoi):
         else:
             raise ValueError("Method must be 'montecarlo', 'analytical' or  'both'.")
 
-
     def probabilitiesToVoronoiCellsMC(self, sigma=5/3.2):
         # Monte Carlo simulation to estimate Voronoi cell probabilities
         MCsamples = int(1e6)
-        counter = np.zeros(len(self.points)+1)
+        counter = np.zeros(len(self.displacements)+1)
         #MCpoints = np.random.normal(0, sigma, (MCsamples, 3))
         MCpointsX = np.random.normal(0, sigma, MCsamples) / self.spacing[0]
         MCpointsY = np.random.normal(0, sigma, MCsamples) / self.spacing[1]
         MCpointsZ = np.random.normal(0, sigma, MCsamples) / self.spacing[2]
         MCpoints = np.vstack([MCpointsX, MCpointsY, MCpointsZ]).T
-        tree = cKDTree(self.points)
+        tree = cKDTree(self.displacements)
         dists, locations = tree.query(MCpoints, k=1)
         for loc in locations:
             counter[loc] += 1
@@ -88,7 +95,7 @@ class VoronoiCells(Voronoi):
     def probabilitiesToVoronoiCellsAnalytical(self):
         # Analytical calculation of Voronoi cell probabilities
         probabilities_analytical = []
-        for point in self.points:
+        for point in self.displacements:
             x, y, z = point
             x = x * self.spacing[0]
             y = y * self.spacing[1]
@@ -120,7 +127,7 @@ def TestVoronoiCells(limit, sigma=1.6, plot=True):
     probabilitiesMC = voronoi_cells.probabilitiesMC
     #analytical probabilities
     probabilities_analytical = voronoi_cells.probabilities_analytical
-    vor_points = voronoi_cells.points
+    vor_points = voronoi_cells.displacements
     
     print("Voronoi Points and Analytical Probabilities:\n")
     print("vor_ponts.shape:", vor_points.shape)
