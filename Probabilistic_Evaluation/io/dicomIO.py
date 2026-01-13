@@ -6,9 +6,9 @@ import numpy as np
 
 from opentps.core.io.dicomIO import *
 from opentps.core.io.dataLoader import *
-from opentps.core.data.images._doseImage import *
-from opentps.core.data.images._ctImage import *
-from opentps.core.data._rtStruct import *
+from opentps.core.data.images import DoseImage
+from opentps.core.data.images import CTImage
+from opentps.core.data import RTStruct
 
 
 

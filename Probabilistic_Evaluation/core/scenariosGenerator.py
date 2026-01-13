@@ -3,9 +3,9 @@ sys.path.append('.')
 
 import numpy as np  
 from voronoiReduction import VoronoiCells
-from Probabilistic_Evaluation.data._patientData import PatientData
+from Probabilistic_Evaluation.data import PatientData
 import matplotlib.pyplot as plt
-from Probabilistic_Evaluation.data._scenario import Scenario 
+from Probabilistic_Evaluation.data import Scenario
 
 class ScenariosGenerator:
     """
