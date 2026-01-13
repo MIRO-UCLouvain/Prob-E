@@ -50,7 +50,7 @@ class DVH(object):
         self._Dmean = dmean
         self.DMean
         self._spacing = spacing
-
+        self.computeDVH()
     @property
     def dosemap(self) -> np.ndarray:
         return self._dosemap
