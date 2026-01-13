@@ -1,42 +1,51 @@
-from data._DVH import DVH
-from data._scenario import Scenario
-from data._patientData import PatientData
+from Probabilistic_Evaluation.core import ScenariosGenerator
+from data import DVH
+from data import Scenario
+from data import PatientData
+from data import AbstractClinicalGoal
+from ScenariosGenerator import ScenariosGenerator
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
 class ProbabilisticEvaluator:
 
-    def __init__(self, scenarios:[Scenario], priority_list: list[str]=None):
-        self.scenarios = scenarios
-        self.clinical_goals = self.scenarios[0].patientData.clinicalGoalsDict 
-        self.priority_list = priority_list #assume list with names of clinical goals in order of priority
-        
-        
-        
-    def evaluate_all_scenarios(self):
-        """
-        Evaluate all scenarios and compute clinical goal values + Passing Rate.
-        """
-        for scenario in self.scenarios:
-            scenario.computeGoalValues()
-        for goal in self.clinical_goals.keys():
-            PR = 0
-            for s in self.scenarios:
-                if s.clinicalGoalsValuesAchieved[goal]:
-                    PR += s.scenarioProbability
-                
-            self.clinical_goals[goal].SetPassingRate(PR) #need passing rate attribute in clinical goal class
-    
-    
-    def evaluate_scenario(self, scenario:Scenario):
-        """
-        Basically a wrapper for the computeGoalValues method in Scenario class
-        that returns the clinical goal values for a given scenario.
+    def __init__(self, PatientData:PatientData, calc_VWMin:bool=False, calc_VWMax:bool=False, calc_CummulPR:bool=False):
+        self.patientData = PatientData
+        self.scenarios = None
+        self.clinical_goals = self.patientData.clinicalGoalsList 
+        self.calc_VWMin = calc_VWMin
+        self.calc_VWMax = calc_VWMax
+        self.calc_CummulPR = calc_CummulPR
+        self.VWMin = None
+        self.VWMax = None
+        if self.calc_VWMin:
+            self.VWMin = self.patientData.doseImage
+        if self.calc_VWMax:
+            self.VWMax = np.zeros_like(self.patientData.doseImage)
+        self.CummulPR = None
+        self.PR = None
 
-        """
-        scenario.computeGoalValues()
-        return scenario.clinlicalGoalsValues
+    
+    def evaluate(self):
+        self.scenarios = ScenariosGenerator(self.patientData).scenarios_list
+        
+        for scenario in self.scenarios:
+            scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
+            dvh_dict = {}  
+            for mask in self.patientData.maskDict.keys():
+                dvh_dict[mask] = DVH(doseImage=scenario.doseImage, structureMask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
+            for goal in self.clinical_goals:
+                goal.computevalue(dvh_dict[goal.maskName])
+            if self.calc_VWMin:
+                self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
+            if self.calc_VWMax:
+                self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
+            scenario.delete_doseImage()
+        if self.calc_CummulPR:
+            self.calc_CummulPR()
+            
+            
 
     def passingRate_table(self):
         """
@@ -53,44 +62,40 @@ class ProbabilisticEvaluator:
         df = pd.DataFrame(data)
         print(df.to_string(index=False))
     
+
+    def calculate_passingRates(self):
+        PR = []
+        for goal in self.clinical_goals.values():
+            p = 0.0
+            for i, s in enumerate(goal.scenariosValuesAchieved):
+                
+                if s:
+                    p += self.scenarios[i].probability
+            PR.append(p)
+        self.PR = PR
+
     def calculate_cummul_PR(self):
         """
         need some form of prioritization of clinical goals to calculate a cummulative passing rate
         """
+        cummul_PR = []
         i=1
-        cummul_PR_prev = self.clinical_goals[self.priority_list[0]].passingRate
-        self.clinical_goals[self.priority_list[0]].SetCummulative_passingRate(cummul_PR_prev)
-        scenarios_left = [self.scenarios[j] for j in range(len(self.scenarios)) if self.scenarios[j].clinicalGoalsValuesAchieved[self.priority_list[0]]] #should i copy?
-        while i < len(self.priority_list): 
-            goal_name = self.priority_list[i]
-            indices_to_keep = [i for i, x in enumerate(scenarios_left) if x.clinicalGoalsValuesAchieved[goal_name]]
-            cummul_PR = sum([scenarios_left[j].scenarioProbability for j in indices_to_keep])
-            scenarios_left = [scenarios_left[j] for j in indices_to_keep]
+        cummul_PR_prev = self.PR[0]
+        cummul_PR.append(cummul_PR_prev)
+        remaining_succesList = self.clinical_goals[0].succesList
+        while i < len(self.clinical_goals): 
+            remaining_succesList = [x*y for x,y in (self.clinical_goals[i].succesList,remaining_succesList)]
+            cummul_PR_current = sum([self.scenarios[j].probability for j, x in enumerate(remaining_succesList) if x])
+
             #two options either absolute cummulative passing rate or relative cummulative passing rate
             #1. absolute
-            self.clinical_goals[goal_name].SetCummulative_passingRate(cummul_PR)
+            cummul_PR.append(cummul_PR_current)
             #2. relative
             #self.clinical_goals[goal_name].SetCummulative_passingRate(cummul_PR / cummul_PR_prev)
+            #cummul_PR = cummul_PR_current*cummul_PR_prev
+            cummul_PR_prev = cummul_PR_current
+            i+=1
+        self.CummulPR = cummul_PR
+           
 
-            cummul_PR_prev = cummul_PR
-            i+=1  
-
-    #Next three functions assume that all (displaced) dose images have the same shape
-    def voxelwise_min_map(self):
-        """
-        Compute voxel-wise minimum dose map across all scenarios.
-        """
-        dose_maps = [s.doseImageScenario for s in self.scenarios]
-        min_map = np.minimum.reduce(dose_maps)
-        return min_map
-    
-    def voxelwise_max_map(self):
-        """
-        Compute voxel-wise maximum dose map across all scenarios.
-        """
-        dose_maps = [s.doseImageScenario for s in self.scenarios]
-        max_map = np.maximum.reduce(dose_maps)
-        return max_map
-    
-    def prob_dose_map(self):
-        return np.sum([s.doseImageScenario * s.scenarioProbability for s in self.scenarios], axis=0)
+   

@@ -43,9 +43,9 @@ class Scenario(object):
             raise ValueError("Scenario probability must be between 0 and 1.")
         self._probability = newProbability
 
-    def compute_shifted_image(self,displacement: np.ndarray) -> np.ndarray:
+    def compute_shifted_image(self,initial_dose_image,displacement: np.ndarray) -> np.ndarray:
         shift_x, shift_y, shift_z = displacement
-        self._doseImage = shift_dose_image(self._doseImage, shift=(shift_x, shift_y, shift_z))
+        self._doseImage = shift_dose_image(initial_dose_image, shift=(shift_x, shift_y, shift_z))
 
     def delete_doseImage(self):
         self._doseImage = None
