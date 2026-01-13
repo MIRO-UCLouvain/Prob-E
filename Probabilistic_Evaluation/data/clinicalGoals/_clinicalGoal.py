@@ -18,6 +18,12 @@ class AbstractClinicalGoal(ABC):
         Indicates if the goal has been achieved.
     mask : np.ndarray
         The mask defining the region of interest for the clinical goal.
+    maskName : str
+        The name of the mask defining the region of interest for the clinical goal.
+    passingRate : float
+        The passing rate associated with the clinical goal in % (0-1).
+    cummulativePassingRate : float
+        The cumulative passing rate associated with the clinical goal in % (0-1).
 
     Methods
     -------
@@ -33,7 +39,7 @@ class AbstractClinicalGoal(ABC):
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
         self._passingRate: float = None
-        self._cummulative_passingRate: float = None
+        self._cummulativePassingRate: float = None
 
     @property
     def prescription(self) -> float:
@@ -79,13 +85,21 @@ class AbstractClinicalGoal(ABC):
     def maskName(self, newMaskName: str):
         self._maskName = newMaskName
 
+    @property
+    def passingRate(self) -> float:
+        return self._passingRate
+
     @passingRate.setter
-    def SetPassingRate(self, passingRate: float):
+    def passingRate(self, passingRate: float):
         self._passingRate = passingRate
+
+    @property
+    def cummulativePassingRate(self) -> float:
+        return self._cummulativePassingRate
     
-    @_cummulative_passingRate.setter
-    def SetCummulative_passingRate(self, cummulative_passingRate: float):
-        self._cummulative_passingRate = cummulative_passingRate
+    @cummulativePassingRate.setter
+    def cummulativePassingRate(self, cummulative_passingRate: float):
+        self._cummulativePassingRate = cummulative_passingRate
 
 
     @abstractmethod
