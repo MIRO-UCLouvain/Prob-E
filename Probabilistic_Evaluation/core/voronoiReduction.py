@@ -1,7 +1,10 @@
-import numpy as np
-from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
-import matplotlib.pyplot as plt
+import sys
+sys.path.append('.')
 
+import numpy as np
+from scipy.spatial import Voronoi, cKDTree
+import matplotlib.pyplot as plt
+from Probabilistic_Evaluation.data.uncertaintyModel._Gaussian3D import Gaussian3DUncertaintyModel
 
 
 def gaussian3D(x, y, z, mu=0, sigma=3):
@@ -35,7 +38,8 @@ class VoronoiCells(Voronoi):
             Calculate Voronoi cell probabilities analytically.
     
     """
-    def __init__(self, limit, spacing, method = 'analytical'):
+    def __init__(self, limit, spacing, sigmas, method = 'analytical'):
+        self.UncertaintyModel = Gaussian3DUncertaintyModel({'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigmas[0], 'sigma_y': sigmas[1], 'sigma_z': sigmas[2]})
         limitX = np.round(limit / spacing[0])
         limitY = np.round(limit / spacing[1])
         limitZ = np.round(limit / spacing[2])
@@ -84,10 +88,13 @@ class VoronoiCells(Voronoi):
             x = x * self.spacing[0]
             y = y * self.spacing[1]
             z = z * self.spacing[2]
-            integral_x = intergral_gaussian_1D(x - self.spacing[0]/2, x + self.spacing[0]/2, mu=0, sigma=sigma)
-            integral_y = intergral_gaussian_1D(y - self.spacing[1]/2, y + self.spacing[1]/2, mu=0, sigma=sigma)
-            integral_z = intergral_gaussian_1D(z - self.spacing[2]/2, z + self.spacing[2]/2, mu=0, sigma=sigma)
-            prob = integral_x * integral_y * integral_z
+            a = [x - self.spacing[0]/2, y - self.spacing[1]/2, z - self.spacing[2]/2]
+            b = [x + self.spacing[0]/2, y + self.spacing[1]/2, z + self.spacing[2]/2]
+            prob = self.UncertaintyModel.boundedIntegral(a, b)
+            # integral_x = intergral_gaussian_1D(x - self.spacing[0]/2, x + self.spacing[0]/2, mu=0, sigma=sigma)
+            # integral_y = intergral_gaussian_1D(y - self.spacing[1]/2, y + self.spacing[1]/2, mu=0, sigma=sigma)
+            # integral_z = intergral_gaussian_1D(z - self.spacing[2]/2, z + self.spacing[2]/2, mu=0, sigma=sigma)
+            # prob = integral_x * integral_y * integral_z
             probabilities_analytical.append(prob)
 
         
@@ -99,8 +106,9 @@ class VoronoiCells(Voronoi):
 def TestVoronoiCells(limit, sigma=1.6, plot=True):
     # Generate random points
     spacing = (1.0, 1.0, 2.0)
+    sigmas = (sigma, sigma, sigma)
     # Create Voronoi cells
-    voronoi_cells = VoronoiCells(limit, spacing, method='both')
+    voronoi_cells = VoronoiCells(limit, spacing, sigmas, method='both')
 
     # Monte Carlo simulation to estimate Voronoi cell probabilities
     probabilitiesMC = voronoi_cells.probabilitiesMC

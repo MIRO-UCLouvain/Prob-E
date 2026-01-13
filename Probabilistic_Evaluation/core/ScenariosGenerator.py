@@ -29,7 +29,7 @@ class ScenariosGenerator:
         evaluate_scenario(doseImage=None):
             Evaluate the scenario based on the shifted dose image.
     """
-    def __init__(self,patientData:PatientData,max_displacement=5,sampling_method='voronoi'):
+    def __init__(self,patientData:PatientData,max_displacement=5,sigmas=(1.6, 1.6, 1.6), sampling_method='voronoi'):
 
         self.ctImage = patientData.ctImage
         self.doseImage = patientData.doseImage
@@ -37,7 +37,7 @@ class ScenariosGenerator:
         self.spacing = patientData.spacing
         self.displacements = np.arange(-max_displacement, max_displacement+1, 1)  # Example displacement range from -5 to 5
         if sampling_method == 'voronoi':
-            self.voronoi_cells = VoronoiCells(max_displacement,self.spacing) 
+            self.voronoi_cells = VoronoiCells(max_displacement,self.spacing,sigmas=sigmas) 
         else:
             raise NotImplementedError("Only 'voronoi' sampling method is implemented.") 
 
@@ -65,8 +65,9 @@ def test_probabilistic_scenarios():
     spacing = (1.0, 1.0, 2.0)  # Example spacing
 
     patientData = PatientData(ctImage, doseImage, maskdict, spacing=spacing)
+    sigma = 5/3.2
 
-    ps = ScenariosGenerator(patientData, max_displacement=5)
+    ps = ScenariosGenerator(patientData, max_displacement=5,sigmas=(sigma, sigma, sigma), sampling_method='voronoi')
     
     # print("Evaluation results for all scenarios:", results)
     #2 plots, one showing the results as afucntion of scenario index and other one show probabilities of voronoi cells as function on cell(scenario) index
