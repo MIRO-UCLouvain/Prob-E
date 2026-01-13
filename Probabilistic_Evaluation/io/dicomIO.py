@@ -13,11 +13,19 @@ from opentps.core.data._rtStruct import *
 
 
 class DicomReader():
+    """
+    A class to read and process DICOM files including CT images, RTSTRUCT, and RTDOSE.
+    Attributes:
+        CT (ndarray): The CT image data.
+        RTSTRUCT (dict): The RT structure data.
+        RTDOSE (ndarray): The RT dose image data.
+        spacing (tuple): The spacing of the CT image.
+    """
     def __init__(self):
-        self.CT = None
-        self.RTSTRUCT = None
-        self.RTDOSE = None
-        self.spacing = None
+        self.CT: np.ndarray = None
+        self.RTSTRUCT: dict = None
+        self.RTDOSE: np.ndarray = None
+        self.spacing: tuple = None
         self.data = None
 
     def load_dicom_series(self,directory):
@@ -35,7 +43,7 @@ class DicomReader():
 
         self.RTDOSE = self.readRTDOSE()
         self.RTSTRUCT = self.readRTSTRUCT()
-                
+        print(self.RTSTRUCT)
 
 
         # CTImage = readDicomCT(directory)
@@ -60,17 +68,22 @@ class DicomReader():
         for key in self.data:
             if isinstance(key, DoseImage):
                 key.resample(self.spacing,self.CTImage.gridSize,self.CTImage.origin)
-                RTDOSE = key.imageArray
-                print(f"RTDOSE Image shape: {RTDOSE.shape} and spacing: {key.spacing}")
-                return RTDOSE
+                RTdose = key.imageArray
+                print(f"RTDOSE Image shape: {RTdose.shape} and spacing: {key.spacing}")
+                return RTdose
         raise ValueError("No DoseImage found in the provided DICOM series.")
     
     def readRTSTRUCT(self):
+        RTstruct_dictionary = {}
         for key in self.data:
             if isinstance(key, RTStruct):
-                RTSTRUCT = key
-                print(f"RTSTRUCT loaded with {len(RTSTRUCT.name)} structures.")
-                return RTSTRUCT
+                RTstruct = key
+                print(f"RTSTRUCT loaded with {len(RTstruct.name)} structures.")
+                for contour in RTstruct._contours:
+                    print(f"Structure: {contour.name}")
+                    RTstruct_dictionary[contour.name] = contour.getBinaryMask(origin=self.CTImage.origin, gridSize=self.CTImage.gridSize, spacing=self.spacing)
+                    
+                return RTstruct_dictionary
         raise ValueError("No RTStruct found in the provided DICOM series.")
 
 if __name__ == "__main__":
