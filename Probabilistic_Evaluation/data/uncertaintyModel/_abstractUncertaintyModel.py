@@ -24,7 +24,7 @@ class AbstractUncertaintyModel(ABC):
 
         Parameters
         ----------
-        x : float
+        x : float or array-like
             The point at which to evaluate the PDF.
 
         Returns
