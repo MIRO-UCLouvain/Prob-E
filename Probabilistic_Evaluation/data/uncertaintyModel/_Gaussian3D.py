@@ -14,15 +14,15 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         The name of the uncertainty model.
     parameters : dict
         A dictionary containing the parameters of the Gaussian model:
-        - 'mu_x': Mean in x direction
-        - 'mu_y': Mean in y direction
-        - 'mu_z': Mean in z direction
-        - 'sigma_x': Standard deviation in x direction
-        - 'sigma_y': Standard deviation in y direction
-        - 'sigma_z': Standard deviation in z direction
+        - 'mu_x': Mean in x direction (default: 0)
+        - 'mu_y': Mean in y direction (default: 0)
+        - 'mu_z': Mean in z direction (default: 0)
+        - 'sigma_x': Standard deviation in x direction (default: 5/3.2)
+        - 'sigma_y': Standard deviation in y direction (default: 5/3.2)
+        - 'sigma_z': Standard deviation in z direction (default: 5/3.2)
     """
 
-    def __inti__(self, parameters: dict = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': 1, 'sigma_y': 1, 'sigma_z': 1}):
+    def __inti__(self, parameters: dict = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': 5/(3.2), 'sigma_y': 5/(3.2), 'sigma_z': 5/(3.2)}):
         super().__init__()
         self.name: str = "Gaussian3DUncertaintyModel"
         self.parameters: dict = parameters
