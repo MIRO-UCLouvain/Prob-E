@@ -41,6 +41,13 @@ class DXClinicalGoal(AbstractClinicalGoal):
             raise ValueError("Volume must be given in percentage (0-1).")
         self._volume = newVolume
 
+    def __str__(self):
+        if self.lower_is_better:
+            comparison = "<="
+        else:
+            comparison = ">="
+        return f"D{self.volume*100:.1f}%{comparison}{self.prescription}"
+
     def compute_value(self, dvh) -> float:
         """
         Compute the dose corresponding to the specified volume from the DVH.

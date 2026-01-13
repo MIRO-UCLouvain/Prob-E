@@ -1,0 +1,42 @@
+# Ruff toml file
+# Specifies the configuration for the Ruff linter (rules, ignores, etc.)
+
+# Ignoring all files specified in .gitignore
+respect-gitignore = true
+
+# specify python version
+target-version = "py312"
+
+# set line length
+line-length = 300 #we do not want Ruff do interfere with long imports
+
+
+# select specific rules to enable
+[lint]
+select = [
+    "E", # All pycodestyle errors
+    "F", # All pyflakes errors
+    "W", # All pycodestyle warnings
+    "I", # Import-related rules
+    "D", # Docstring-related rules
+]
+
+# ignore specific rules
+ignore = [
+    #"E501", # Line too long
+    "D100", # Missing module docstring
+    "D104", # Missing package docstring
+    "D401", # First line should be in imperative mood
+
+]
+
+# Ignore doc in gui
+[lint.per-file-ignores]
+"tests/*" = ["D", "F"]
+
+[lint.pydocstyle]
+convention = "numpy"
+
+[format]
+quote-style = "double"
+indent-style = "space"

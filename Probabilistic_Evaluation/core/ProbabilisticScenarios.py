@@ -3,7 +3,7 @@ sys.path.append('.')
 
 import numpy as np  
 from voronoiReduction import VoronoiCells
-from data.PatientData import PatientData
+from Probabilistic_Evaluation.data._patientData import PatientData
 
 class ProbabilisticScenarios:
     """

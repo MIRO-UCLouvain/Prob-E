@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
 import matplotlib.pyplot as plt
-import pytest
+
 
 
 def gaussian3D(x, y, z, mu=0, sigma=3):

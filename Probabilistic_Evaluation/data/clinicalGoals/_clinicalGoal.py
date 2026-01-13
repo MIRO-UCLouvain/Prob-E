@@ -1,8 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
-class AbstractClinicalGoal(ABC):
 
+class AbstractClinicalGoal(ABC):
     """
     Abstract base class for clinical goals.
 
@@ -25,13 +25,15 @@ class AbstractClinicalGoal(ABC):
         Abstract method to compute the value of the clinical goal.
     """
 
-    def __init__(self,prescription: float,mask: np.ndarray,lower_is_better: bool = True,**kwargs):
-        if prescription < 0 :
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
+        if prescription < 0:
             raise ValueError("Clinical goal prescription cannot be negative.")
-        self._prescription : float = prescription
-        self._lower_is_better : bool = lower_is_better
-        self._mask : np.ndarray = mask
-
+        self._prescription: float = prescription
+        self._lower_is_better: bool = lower_is_better
+        self._mask: np.ndarray = mask
+        self._maskName: str = maskName
+        self._passingRate: float = None
+        self._cummulative_passingRate: float = None
 
     @property
     def prescription(self) -> float:
@@ -44,6 +46,7 @@ class AbstractClinicalGoal(ABC):
     @property
     def value(self) -> float:
         return self._value
+
     @value.setter
     def value(self, newValue: float):
         if newValue < 0:
@@ -51,9 +54,11 @@ class AbstractClinicalGoal(ABC):
         if self._value is not None:
             self._achieved = None  # Reset achieved status
         self._value = newValue
+
     @property
     def lower_is_better(self) -> bool:
         return self._lower_is_better
+
     @lower_is_better.setter
     def lower_is_better(self, newLowerIsBetter: bool):
         self._lower_is_better = newLowerIsBetter
@@ -61,15 +66,34 @@ class AbstractClinicalGoal(ABC):
     @property
     def mask(self) -> np.ndarray:
         return self._mask
+
     @mask.setter
     def mask(self, newMask: np.ndarray):
         self._mask = newMask
 
-    def __str__(self):
-        return f"Clinical Goal: Prescription={self.prescription}, Value={self.value}, Lower is Better={self.lower_is_better}, Achieved={self.achieved}"
+    @property
+    def maskName(self) -> str:
+        return self._maskName
+
+    @maskName.setter
+    def maskName(self, newMaskName: str):
+        self._maskName = newMaskName
+
+    @passingRate.setter
+    def SetPassingRate(self, passingRate: float):
+        self._passingRate = passingRate
+    
+    @_cummulative_passingRate.setter
+    def SetCummulative_passingRate(self, cummulative_passingRate: float):
+        self._cummulative_passingRate = cummulative_passingRate
+
 
     @abstractmethod
-    def compute_value(self,dvh)-> float:
+    def __str__(self):
+        pass
+
+    @abstractmethod
+    def compute_value(self, dvh) -> float:
         """
         Compute the value of the clinical goal based on the provided DVH.
         Parameters
@@ -82,4 +106,3 @@ class AbstractClinicalGoal(ABC):
             The computed value of the clinical goal.
         """
         pass
-
