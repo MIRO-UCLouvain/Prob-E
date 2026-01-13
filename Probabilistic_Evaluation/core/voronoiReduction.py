@@ -68,7 +68,7 @@ class VoronoiCells(Voronoi):
             raise ValueError("Method must be 'montecarlo', 'analytical' or  'both'.")
 
 
-    def probabilitiesToVoronoiCellsMC(self, sigma=1.6):
+    def probabilitiesToVoronoiCellsMC(self, sigma=5/3.2):
         # Monte Carlo simulation to estimate Voronoi cell probabilities
         MCsamples = int(1e6)
         counter = np.zeros(len(self.points)+1)
@@ -85,7 +85,7 @@ class VoronoiCells(Voronoi):
         self.probabilitiesMC = counter / MCsamples
         return self.probabilitiesMC
         
-    def probabilitiesToVoronoiCellsAnalytical(self, sigma=1.6):
+    def probabilitiesToVoronoiCellsAnalytical(self):
         # Analytical calculation of Voronoi cell probabilities
         probabilities_analytical = []
         for point in self.points:
@@ -96,6 +96,7 @@ class VoronoiCells(Voronoi):
             a = [x - self.spacing[0]/2, y - self.spacing[1]/2, z - self.spacing[2]/2]
             b = [x + self.spacing[0]/2, y + self.spacing[1]/2, z + self.spacing[2]/2]
             prob = self.UncertaintyModel.boundedIntegral(a, b)
+            # sigma = 5/3.2
             # integral_x = intergral_gaussian_1D(x - self.spacing[0]/2, x + self.spacing[0]/2, mu=0, sigma=sigma)
             # integral_y = intergral_gaussian_1D(y - self.spacing[1]/2, y + self.spacing[1]/2, mu=0, sigma=sigma)
             # integral_z = intergral_gaussian_1D(z - self.spacing[2]/2, z + self.spacing[2]/2, mu=0, sigma=sigma)
