@@ -1,13 +1,13 @@
-from data._DVH import DVH
-from data._scenario import Scenario
-from data._patientData import PatientData
+from data import DVH
+from data import Scenario
+from data import PatientData
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
 class ProbabilisticEvaluator:
 
-    def __init__(self, scenarios:[Scenario], priority_list: list[str]=None):
+    def __init__(self, scenarios:list[Scenario], priority_list: list[str]=None):
         self.scenarios = scenarios
         self.clinical_goals = self.scenarios[0].patientData.clinicalGoalsDict 
         self.priority_list = priority_list #assume list with names of clinical goals in order of priority
@@ -94,3 +94,23 @@ class ProbabilisticEvaluator:
     
     def prob_dose_map(self):
         return np.sum([s.doseImageScenario * s.scenarioProbability for s in self.scenarios], axis=0)
+
+
+    def computeGoalValues(self):
+        """
+        Computes the values for clinical goals based on the dose distribution and patient data.
+
+        Returns
+        -------
+
+        """
+        used_masks = set(self._patientData.clinicalGoalsDict.values()[i].maskName for i in range(len(self._patientData.clinicalGoalsDict)))
+        for name in used_masks:
+            dvh = DVH(self._doseImageScenario, self._patientData.maskDict[name],spacing=self._patientData.spacing)
+            for goal in self._patientData.clinicalGoalsDict.values():
+                if goal.maskName != name:
+                    continue
+                value = goal.compute_value(dvh)
+                achieved = goal.achieved
+                self._clinicalGoalsValues[goal.__str__()] = value
+                self._clinicalGoalsValuesAchieved[goal.__str__()] = achieved
