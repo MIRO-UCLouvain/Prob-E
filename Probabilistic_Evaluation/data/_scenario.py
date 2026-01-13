@@ -1,6 +1,7 @@
 import numpy as np
 from ._patientData import PatientData
 from ._DVH import DVH
+from Probabilistic_Evaluation.utils import *
 
 
 class Scenario(object):
@@ -10,7 +11,7 @@ class Scenario(object):
     """
 
     def __init__(self, doseImageScenario: np.ndarray, patientData: PatientData):
-        self._doseImageScenario = doseImageScenario
+        self.doseImageScenario = doseImageScenario
         self._patientData = patientData
         self._scenarioDisplacement: np.ndarray = None
         self._scenarioProbability: float = None
@@ -86,3 +87,10 @@ class Scenario(object):
                 achieved = goal.achieved
                 self._clinicalGoalsValues[goal.__str__()] = value
                 self._clinicalGoalsValuesAchieved[goal.__str__()] = achieved
+
+    def compute_shifted_image(self,displacement: np.ndarray) -> np.ndarray:
+        for point in self.points:
+            shift_x, shift_y, shift_z = point
+            self.doseImageScenario = shift_dose_image(self.doseImage, shift=(shift_x, shift_y, shift_z))
+
+

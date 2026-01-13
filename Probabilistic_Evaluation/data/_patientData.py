@@ -25,6 +25,7 @@ class PatientData:
         self._ctImage = ctImage
         self._doseImage = doseImage
         self._maskDict = maskDict
+        self._spacing = spacing
         self._clinicalGoalsDict : dict = {}
 
     @property
@@ -50,6 +51,13 @@ class PatientData:
     @maskDict.setter
     def maskDict(self, newMaskDict: dict):
         self._maskDict = newMaskDict
+
+    @property
+    def spacing(self) -> tuple:
+        return self._spacing
+    @spacing.setter
+    def spacing(self, newSpacing: tuple):
+        self._spacing = newSpacing
 
     @property
     def clinicalGoalsDict(self) -> dict:
