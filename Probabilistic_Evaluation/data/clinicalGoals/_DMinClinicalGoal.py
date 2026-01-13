@@ -24,7 +24,7 @@ class DMinClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"DMIN{comparison}{self.prescription}"
+        return f"{self.maskName}:DMIN{comparison}{self.prescription}"
 
     def compute_value(self, dvh) -> float:
         """

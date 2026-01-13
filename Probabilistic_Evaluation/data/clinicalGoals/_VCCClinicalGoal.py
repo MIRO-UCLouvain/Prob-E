@@ -41,7 +41,7 @@ class VCCClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"V{self.dose}%{comparison}{self.prescription:.2f}cc"
+        return f"{self.maskName}:V{self.dose}%{comparison}{self.prescription:.2f}cc"
 
     def compute_value(self, dvh) -> float:
         """

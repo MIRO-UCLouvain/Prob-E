@@ -24,7 +24,7 @@ class DMeanClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"DMEAN{comparison}{self.prescription}"
+        return f"{self.maskName}:DMEAN{comparison}{self.prescription}"
 
     def compute_value(self, dvh) -> float:
         """

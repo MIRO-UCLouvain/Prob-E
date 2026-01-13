@@ -46,7 +46,7 @@ class DXClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"D{self.volume*100:.1f}%{comparison}{self.prescription}"
+        return f"{self.maskName}:D{self.volume*100:.1f}%{comparison}{self.prescription}"
 
     def compute_value(self, dvh) -> float:
         """
