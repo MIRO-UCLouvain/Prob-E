@@ -12,7 +12,7 @@ class Scenario(object):
     def __init__(self, doseImageScenario: np.ndarray, patientData: PatientData):
         self._doseImageScenario = doseImageScenario
         self._patientData = patientData
-        self._scenarioDisplacement: np.ndarray = None
+        self._displacementScenario: np.ndarray = None
         self._scenarioProbability: float = None
         self._clinicalGoalsValues: dict = {}
         self._clinicalGoalsValuesAchieved: dict = {}
