@@ -29,7 +29,7 @@ class ScenariosGenerator:
         evaluate_scenario(doseImage=None):
             Evaluate the scenario based on the shifted dose image.
     """
-    def __init__(self,patientData:PatientData,max_displacement=5,sigmas=(1.6, 1.6, 1.6), sampling_method='voronoi'):
+    def __init__(self,patientData:PatientData,max_displacement=10,sigmas=(1.6, 1.6, 1.6), sampling_method='voronoi'):
 
         self.ctImage = patientData.ctImage
         self.doseImage = patientData.doseImage
@@ -47,9 +47,7 @@ class ScenariosGenerator:
 
     def generate_scenarios(self,patientData:PatientData):
         for i, point in enumerate(self.voronoi_cells.points):
-            scenario = Scenario(patientData)
-            scenario.displacementScenario = point
-            scenario.scenarioProbability = self.voronoi_cells.probabilities_analytical[i]
+            scenario = Scenario(point, self.voronoi_cells.probabilities[i])
             self.scenarios_list.append(scenario)
 
 
@@ -67,7 +65,7 @@ def test_probabilistic_scenarios():
     patientData = PatientData(ctImage, doseImage, maskdict, spacing=spacing)
     sigma = 5/3.2
 
-    ps = ScenariosGenerator(patientData, max_displacement=5,sigmas=(sigma, sigma, sigma), sampling_method='voronoi')
+    ps = ScenariosGenerator(patientData, max_displacement=10,sigmas=(sigma, sigma, sigma), sampling_method='voronoi')
     
     # print("Evaluation results for all scenarios:", results)
     #2 plots, one showing the results as afucntion of scenario index and other one show probabilities of voronoi cells as function on cell(scenario) index
@@ -87,7 +85,8 @@ def test_probabilistic_scenarios():
             print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
         if point.tolist() == [0,0,1]:
             print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
-            shifted_dose = ps.shift_dose_image(ps.doseImage, shift=point)
+            from Probabilistic_Evaluation.utils import shift_dose_image
+            shifted_dose = shift_dose_image(ps.doseImage, shift=point)
             plt.imshow(shifted_dose[:,:,25], cmap='jet')
             plt.colorbar(label='Dose')
             plt.contour(ps.targetMask[:,:,25], colors='white', linewidths=0.5)
