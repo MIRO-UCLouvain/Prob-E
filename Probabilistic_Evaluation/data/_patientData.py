@@ -13,10 +13,17 @@ class PatientData:
         A 3D numpy array representing the dose distribution for the patient.
     maskDict : dict
         A dictionary where keys are structure names (str) and values are 3D numpy arrays representing binary masks for those structures.
-    clinicalGoalsDict : dict
-        A dictionary where keys are structure names (str) and values are lists of ClinicalGoal objects for those structures.
+    clinicalGoalsList : list
+        A list of clinical goal objects associated with the patient.
     spacing : tuple (default=(1.0, 1.0, 1.0))
         A tuple representing the voxel spacing in each dimension (x, y, z).
+
+    Methods
+    -------
+    getClinicalGoalsForStructure(structureName: str) -> list
+        Returns a list of clinical goals associated with the specified structure name.
+    getMask(structureName: str) -> np.ndarray
+        Returns the mask array for the specified structure name.
     """
 
     def __init__(self, ctImage: np.ndarray, doseImage: np.ndarray, maskDict: dict, spacing: tuple = (1.0, 1.0, 1.0)):
@@ -29,7 +36,7 @@ class PatientData:
         self._ctImage = ctImage
         self._doseImage = doseImage
         self._maskDict = maskDict
-        self._clinicalGoalsDict: dict = {}
+        self._clinicalGoalsList = []
         self._spacing = spacing
 
     @property
@@ -57,12 +64,12 @@ class PatientData:
         self._maskDict = newMaskDict
 
     @property
-    def clinicalGoalsDict(self) -> dict:
-        return self._clinicalGoalsDict
+    def clinicalGoalsList(self) -> list:
+        return self._clinicalGoalsList
 
-    @clinicalGoalsDict.setter
-    def clinicalGoalsDict(self, newClinicalGoalsDict: dict):
-        self._clinicalGoalsDict = newClinicalGoalsDict
+    @clinicalGoalsList.setter
+    def clinicalGoalsList(self, newClinicalGoalsList: list):
+        self._clinicalGoalsList = newClinicalGoalsList
 
     @property
     def spacing(self) -> tuple:
@@ -75,13 +82,39 @@ class PatientData:
                 raise ValueError("Spacing values must be positive.")
         self._spacing = newSpacing
 
-    def clinicalGoal(self, structureName: str) -> list:
-        goal = self._clinicalGoalsDict.get(structureName, None)
-        if goal is None:
-            raise ValueError(f"Clinical goal for structure '{structureName}' not found in clinicalGoalsDict.")
-        return goal
+    def getClinicalGoalsForStructure(self, structureName: str) -> list:
+        """
+        Return a list of clinical goals associated with the specified structure name.
+
+        Parameters
+        ----------
+        structureName : str
+            The name of the structure to retrieve clinical goals for.
+
+        Returns
+        -------
+        list
+            A list of clinical goal objects associated with the specified structure name.
+        """
+        goals = [goal for goal in self._clinicalGoalsList if goal.maskName == structureName]
+        if not goals:
+            raise ValueError(f"No clinical goals found for structure '{structureName}'.")
+        return goals
 
     def getMask(self, structureName: str) -> np.ndarray:
+        """
+        Return the mask array for the specified structure name.
+
+        Parameters
+        ----------
+        structureName : str
+            The name of the structure to retrieve the mask for.
+
+        Returns
+        -------
+        np.ndarray
+            The mask array for the specified structure name.
+        """
         mask = self._maskDict.get(structureName, None)
         if mask is None:
             raise ValueError(f"Structure '{structureName}' not found in maskDict.")
