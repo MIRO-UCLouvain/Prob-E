@@ -7,6 +7,26 @@ class Scenario(object):
     """
     A class to represent a clinical scenario for radiation therapy evaluation.
 
+    Attributes
+    ----------
+    doseImageScenario : np.ndarray
+        A 3D numpy array representing the dose distribution for the scenario.
+    patientData : PatientData
+        An instance of PatientData containing patient-specific information.
+    displacementScenario : np.ndarray
+        A 3D numpy array representing the displacement applied in the scenario.
+    scenarioProbability : float
+        A float representing the probability of the scenario occurring.
+    clinicalGoalsValues : dict
+        A dictionary storing the computed values for clinical goals in the scenario.
+    clinicalGoalsValuesAchieved : dict
+        A dictionary indicating whether clinical goals were achieved in the scenario.
+
+    Methods
+    -------
+    computeGoalValues():
+        Computes the values for clinical goals based on the dose distribution and patient data.
+
     """
 
     def __init__(self, doseImageScenario: np.ndarray, patientData: PatientData):
@@ -76,9 +96,16 @@ class Scenario(object):
         self._doseImageScenario = newDoseImageScenario
 
     def computeGoalValues(self):
+        """
+        Computes the values for clinical goals based on the dose distribution and patient data.
+
+        Returns
+        -------
+
+        """
         used_masks = set(self._patientData.clinicalGoalsDict.values()[i].maskName for i in range(len(self._patientData.clinicalGoalsDict)))
         for name in used_masks:
-            dvh = DVH(self._doseImageScenario, self._patientData.maskDict[name])
+            dvh = DVH(self._doseImageScenario, self._patientData.maskDict[name],spacing=self._patientData.spacing)
             for goal in self._patientData.clinicalGoalsDict.values():
                 if goal.maskName != name:
                     continue

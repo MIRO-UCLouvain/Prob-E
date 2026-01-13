@@ -22,8 +22,8 @@ class DVH(object):
         The maximum dose within the masked region.
     DMean : float
         The mean dose within the masked region.
-    spacing : np.ndarray
-        The voxel spacing in each dimension in mm in [x, y, z] order.
+    spacing : tuple (default=(1.0, 1.0, 1.0))
+        A tuple representing the voxel spacing in each dimension (x, y, z).
 
     Methods
     -------
@@ -35,7 +35,7 @@ class DVH(object):
         Computes the volume percentage receiving at least x Gy dose.
     """
 
-    def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0,spacing: np.ndarray = np.array([1.0,1.0,1.0])):
+    def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0, spacing: tuple = (1.0, 1.0, 1.0)):
         self._dosemap = dosemap
         self._mask = mask
         self._bin_dose = None  # Store bin doses for Dx and Vx calculations, makes Dx calculations easier
@@ -120,11 +120,11 @@ class DVH(object):
         self._Dmean = newDMean
 
     @property
-    def spacing(self) -> list[float]:
+    def spacing(self) -> tuple:
         return self._spacing
 
     @spacing.setter
-    def spacing(self, newSpacing: list[float]):
+    def spacing(self, newSpacing: tuple):
         if len(newSpacing) != 3:
             raise ValueError("Spacing must be a list of three float values.")
         if any(s <= 0 for s in newSpacing):
