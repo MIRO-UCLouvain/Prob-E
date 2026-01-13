@@ -67,8 +67,18 @@ class PatientData:
         self._maskDict = newMaskDict
 
     @property
-    def clinicalGoalsList(self) -> list:
-        return self._clinicalGoalsList
+    def spacing(self) -> tuple:
+        return self._spacing
+    @spacing.setter
+    def spacing(self, newSpacing: tuple):
+        self._spacing = newSpacing
+
+    @property
+    def clinicalGoalsDict(self) -> dict:
+        return self._clinicalGoalsDict
+    @clinicalGoalsDict.setter
+    def clinicalGoalsDict(self, newClinicalGoalsDict: dict):
+        self._clinicalGoalsDict = newClinicalGoalsDict
 
     @clinicalGoalsList.setter
     def clinicalGoalsList(self, newClinicalGoalsList: list):

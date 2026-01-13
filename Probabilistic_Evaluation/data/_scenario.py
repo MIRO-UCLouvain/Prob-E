@@ -1,4 +1,5 @@
 import numpy as np
+from Probabilistic_Evaluation.utils import *
 
 
 class Scenario(object):
@@ -41,3 +42,8 @@ class Scenario(object):
         if newProbability < 0 or newProbability > 1:
             raise ValueError("Scenario probability must be between 0 and 1.")
         self._probability = newProbability
+
+    def compute_shifted_image(self,displacement: np.ndarray) -> np.ndarray:
+        shift_x, shift_y, shift_z = displacement
+        self.doseImageScenario = shift_dose_image(self.doseImage, shift=(shift_x, shift_y, shift_z))
+
