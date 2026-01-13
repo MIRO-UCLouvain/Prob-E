@@ -23,7 +23,7 @@ select = [
 
 # ignore specific rules
 ignore = [
-    #"E501", # Line too long
+    "E501", # Line too long
     "D100", # Missing module docstring
     "D104", # Missing package docstring
     "D401", # First line should be in imperative mood

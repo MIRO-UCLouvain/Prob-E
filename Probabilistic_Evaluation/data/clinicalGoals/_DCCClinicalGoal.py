@@ -1,6 +1,6 @@
 import numpy as np
 
-from _clinicalGoal import AbstractClinicalGoal
+from ._clinicalGoal import AbstractClinicalGoal
 
 class DCCClinicalGoal(AbstractClinicalGoal):
     """

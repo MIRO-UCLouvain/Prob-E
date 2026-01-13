@@ -1,2 +1,3 @@
-__all__ = ['dicomIO']
-from dicomIO import *
+from . import dicomIO
+
+__all__ = ["dicomIO"]

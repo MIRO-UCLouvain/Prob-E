@@ -1,9 +1,11 @@
+# Public API for the Probabilistic_Evaluation package
 __all__ = [
     "IO",
     "core",
     "data",
 ]
 
-import IO
-import core
-import data
+# Expose subpackages via relative imports
+from . import IO
+from . import core
+from . import data

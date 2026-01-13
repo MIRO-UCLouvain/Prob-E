@@ -1,8 +1,5 @@
-from data import DVH
-from data import Scenario
-from data import PatientData
+from Probabilistic_Evaluation.data import DVH, Scenario, PatientData
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 
 class ProbabilisticEvaluator:
