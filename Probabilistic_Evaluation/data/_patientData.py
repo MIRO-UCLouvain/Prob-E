@@ -69,21 +69,6 @@ class PatientData:
     @property
     def spacing(self) -> tuple:
         return self._spacing
-    @spacing.setter
-    def spacing(self, newSpacing: tuple):
-        self._spacing = newSpacing
-
-    @property
-    def clinicalGoalsList(self) -> list:
-        return self._clinicalGoalsList
-    
-    @clinicalGoalsList.setter
-    def clinicalGoalsList(self, newClinicalGoalsList: list):
-        self._clinicalGoalsList = newClinicalGoalsList
-
-    @property
-    def spacing(self) -> tuple:
-        return self._spacing
 
     @spacing.setter
     def spacing(self, newSpacing: tuple):
@@ -91,6 +76,13 @@ class PatientData:
             if dim <= 0:
                 raise ValueError("Spacing values must be positive.")
         self._spacing = newSpacing
+    @property
+    def clinicalGoalsList(self) -> list:
+        return self._clinicalGoalsList
+    
+    @clinicalGoalsList.setter
+    def clinicalGoalsList(self, newClinicalGoalsList: list):
+        self._clinicalGoalsList = newClinicalGoalsList
 
     def getClinicalGoalsForStructure(self, structureName: str) -> list:
         """
