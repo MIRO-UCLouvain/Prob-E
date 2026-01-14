@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial import cKDTree
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
-
+from Probabilistic_Evaluation.data.uncertaintyModel._abstractUncertaintyModel import AbstractUncertaintyModel
 
 class VoronoiSampling(AbstractsamplingMethod):
     """
@@ -26,7 +26,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         Retrieve the precomputed Voronoi points and their probabilities.
     """
 
-    def __init__(self, uncertaintyModel: AbstractsamplingMethod, bounds: np.ndarray, spacing: np.ndarray):
+    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, bounds: np.ndarray, spacing: np.ndarray):
         super().__init__(uncertaintyModel)
         if bounds.shape != spacing.shape:
             raise ValueError("Bounds and spacing must have the same shape.")

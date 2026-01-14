@@ -4,6 +4,7 @@ from Probabilistic_Evaluation.data import PatientData
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data import Scenario
 from Probabilistic_Evaluation.utils import shift_dose_image
+from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
 
 class ScenariosGenerator:
     """
@@ -27,23 +28,19 @@ class ScenariosGenerator:
         evaluate_scenario(doseImage=None):
             Evaluate the scenario based on the shifted dose image.
     """
-    def __init__(self,patientData:PatientData,max_displacement=10,sigmas=(1.6, 1.6, 1.6), sampling_method='voronoi'):
+    def __init__(self,patientData:PatientData,sampling_method:AbstractsamplingMethod):
 
         self.ctImage = patientData.ctImage
         self.doseImage = patientData.doseImage
         self.targetMask = patientData.maskDict['Target']
         self.spacing = patientData.spacing
-        self.displacements = np.arange(-max_displacement, max_displacement+1, 1)  # Example displacement range from -5 to 5
-        if sampling_method == 'voronoi':
-            self.voronoi_cells = VoronoiCells(max_displacement,self.spacing,sigmas=sigmas) 
-        else:
-            raise NotImplementedError("Only 'voronoi' sampling method is implemented.") 
-
+        self.sampling_method = sampling_method
         self.scenarios_list = []
-        self.generate_scenarios(patientData)   
+        self.generate_scenarios(patientData)
 
 
-    def generate_scenarios(self,patientData:PatientData):
-        for i, point in enumerate(self.voronoi_cells.points):
-            scenario = Scenario(point, self.voronoi_cells.probabilities[i])
+    def generate_scenarios(self,N_scenario):
+        for i in range(N_scenario):
+            displacement, probability = self.sampling_method.analyticalSampling()
+            scenario = Scenario(displacement=displacement, probability=probability)
             self.scenarios_list.append(scenario)
