@@ -1,5 +1,5 @@
 import numpy as np
-from Probabilistic_Evaluation.core.voronoiReduction import VoronoiCells
+from Probabilistic_Evaluation.core.sampling.voronoiReduction import VoronoiCells
 from Probabilistic_Evaluation.data import PatientData
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data import Scenario

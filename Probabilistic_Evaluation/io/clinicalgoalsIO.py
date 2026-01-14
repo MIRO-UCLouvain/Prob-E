@@ -1,7 +1,8 @@
 import json
 
 
-from Probabilistic_Evaluation.data.clinicalGoals import *
+from Probabilistic_Evaluation.data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
+from Probabilistic_Evaluation.data.clinicalGoals import * 
 
 class clinicalgoalsreader():
     """
@@ -19,10 +20,10 @@ class clinicalgoalsreader():
         A list to store all AbstractClinicalGoal objects created from the clinical_goals_dict.
     """
     def __init__(self, maskDict: dict=None):
-        self.maskDict = maskDict
-        self.path = None
-        self.clinical_goals_dict = None
-        self._clinical_goals_list = None
+        self._maskDict = maskDict
+        self._path = None
+        self.clinical_goals_dict: dict = None
+        self._clinical_goals_list: list = None
 
     @property
     def maskDict(self) -> dict:
@@ -39,15 +40,27 @@ class clinicalgoalsreader():
         self._path = newPath
 
     @property
+    def clinical_goals_dict(self) -> dict:
+        return self._clinical_goals_dict
+    @clinical_goals_dict.setter
+    def clinical_goals_dict(self, newClinicalGoalsDict: dict):
+        self._clinical_goals_dict = newClinicalGoalsDict
+
+    @property
     def clinical_goals_list(self) -> list:
         return self._clinical_goals_list
     @clinical_goals_list.setter
     def clinical_goals_list(self, newClinicalGoalsList: list):
         self._clinical_goals_list = newClinicalGoalsList
 
+
+
+    
+
     def load_JSON_list(self, clinicalgoalpath: str, ):
         self.path = clinicalgoalpath
-        self._clinical_goals_listclinical_goals_list = self.load_clinical_goals()
+        self._clinical_goals_list = self.load_clinical_goals()
+        
 
     def load_clinical_goals(self):
         goals_dict_list = self.load_json_list()
@@ -59,29 +72,31 @@ class clinicalgoalsreader():
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
-        maskName=goal_dict["ROI"],
+        maskName=goal_dict["ROI"]
         mask = self.maskDict[maskName]
-        prescription=goal_dict["dose"],
-        lower_is_better=goal_dict["lower_is_better"],
+        prescription=goal_dict["dose"]
+        lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority", 0)
-        if goal_dict.["type"] == "Dmax":
+        if goal_dict["type"] == "Dmax":
             goal = DMaxClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
         elif goal_dict["type"] == "Dmin":
             goal = DMinClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
         elif goal_dict["type"] == "Dmean":
             goal = DMeanClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] == "DCC":
+        elif goal_dict["type"] == "Dxcc":
             volume = goal_dict["absolute_volume"]
-            goal = DCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better,  **kwargs={'volume': volume})
-        elif goal_dict["type"] == "VCC":
+            goal = DCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better,  volume=volume)
+        elif goal_dict["type"] == "Vxcc":
             volume = goal_dict["absolute_volume"]
-            goal = VCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, **kwargs={'volume': volume})
-        elif goal_dict["type"] == "VX":
-            volume = goal_dict["volume"]
-            goal = VXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, **kwargs={'volume': volume})
-        elif goal_dict["type"] == "DX":
-            volume = goal_dict["volume"]
-            goal = DXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, **kwargs={'volume': volume})
+            goal = VCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, volume=volume)
+        elif goal_dict["type"] == "Vx":
+            volume = goal_dict["volume"]/100.0
+            goal = VXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, volume=volume)
+        elif goal_dict["type"] == "Dx":
+            volume = goal_dict["volume"]/100.0
+            goal = DXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, volume=volume)
+        else:
+            raise ValueError(f"Unknown clinical goal type: {goal_dict['type']}")
         return goal
 
     def load_json_list(self):

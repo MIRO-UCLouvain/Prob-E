@@ -3,9 +3,11 @@ __all__ = [
     "io",
     "core",
     "data",
+    "Examples",
 ]
 
 # Expose subpackages via relative imports
 from . import io
 from . import core
 from . import data
+from . import Examples
