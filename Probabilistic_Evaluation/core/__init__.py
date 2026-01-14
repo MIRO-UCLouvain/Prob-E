@@ -1,9 +1,9 @@
 __all__ = [
     "probabilisticEvaluator",
     "scenariosGenerator",
-    "voronoiReduction",
+    "sampling",
 ]
 
 from . import probabilisticEvaluator
 from . import scenariosGenerator
-from . import voronoiReduction
+import sampling
