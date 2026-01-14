@@ -77,7 +77,7 @@ class PatientData:
     def clinicalGoalsList(self) -> list:
         return self._clinicalGoalsList
     
-    @_clinicalGoalsList.setter
+    @clinicalGoalsList.setter
     def clinicalGoalsList(self, newClinicalGoalsList: list):
         self._clinicalGoalsList = newClinicalGoalsList
 
