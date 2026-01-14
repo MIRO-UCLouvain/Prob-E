@@ -24,8 +24,8 @@ class DMaxClinicalGoal(AbstractClinicalGoal):
         A list to store success status for each scenario.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
+        super().__init__(prescription, mask, maskName, lower_is_better)
 
     def __str__(self):
         if self.lower_is_better:

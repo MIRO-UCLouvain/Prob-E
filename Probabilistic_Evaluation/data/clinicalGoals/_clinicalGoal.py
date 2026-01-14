@@ -18,6 +18,8 @@ class AbstractClinicalGoal(ABC):
         The mask defining the region of interest for the clinical goal.
     maskName : str
         The name of the mask defining the region of interest for the clinical goal.
+    priority : int (default=0)
+        The priority level of the clinical goal.
     valueList : list
         A list to store list of values computed for the clinical goal on each scenario.
     successList : list
@@ -40,6 +42,7 @@ class AbstractClinicalGoal(ABC):
         self._lower_is_better: bool = lower_is_better
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
+        self._priority: int = kwargs.get('priority', 0)
         self.valueList: list = []
         self.successList: list = []
 
@@ -86,6 +89,14 @@ class AbstractClinicalGoal(ABC):
     @maskName.setter
     def maskName(self, newMaskName: str):
         self._maskName = newMaskName
+
+    @property
+    def priority(self) -> int:
+        return self._priority
+
+    @priority.setter
+    def priority(self, newPriority: int):
+        self._priority = newPriority
 
 
     @abstractmethod
