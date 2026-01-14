@@ -1,7 +1,8 @@
-from Probabilistic_Evaluation.io import *
-from core.scenariosGenerator import ScenariosGenerator
-from data._patientData import PatientData
-from core.probabilisticEvaluator import ProbabilisticEvaluator
+from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
+from Probabilistic_Evaluation.data import PatientData
+from Probabilistic_Evaluation.core.probabilisticEvaluator import ProbabilisticEvaluator
+from Probabilistic_Evaluation.io.dicomReader import DicomReader
+from Probabilistic_Evaluation.io.clinicalgoalsreader import clinicalgoalsreader
 
 
 #Read images from DICOM
