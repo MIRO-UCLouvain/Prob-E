@@ -1,16 +1,7 @@
 import json
-<<<<<<< HEAD
-from data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
-from data.clinicalGoals._DMaxClinicalGoal import DMaxClinicalGoal
-from data.clinicalGoals._DMinClinicalGoal import DMinClinicalGoal
-from data.clinicalGoals._DMeanClinicalGoal import DMeanClinicalGoal
-from data.clinicalGoals._DCCClinicalGoal import DCCClinicalGoal
-from data.clinicalGoals._VCCClinicalGoal import VCCClinicalGoal
-from data.clinicalGoals._VXClinicalGoal import VXClinicalGoal
-from data.clinicalGoals._DXClinicalGoal import DXClinicalGoal
-=======
-from Probabilistic_Evaluation.Evaluation.clinicalgoals import *
->>>>>>> 009a2dc2f613ae8635e9689a6f45528702098012
+
+
+from Probabilistic_Evaluation.data.clinicalGoals import *
 
 class clinicalgoalsreader():
     """
@@ -24,6 +15,8 @@ class clinicalgoalsreader():
         A dictionary of masks with mask names as keys and mask arrays as values.
     clinical_goals_dict : dict
         A dictionary to store clinical in dictionary format loaded from the JSON file.
+    clinical_goals_list : list
+        A list to store all AbstractClinicalGoal objects created from the clinical_goals_dict.
     """
     def __init__(self, clinicalgoalpath: str, maskDict: dict=None):
         self.path = clinicalgoalpath
@@ -47,17 +40,17 @@ class clinicalgoalsreader():
         lower_is_better=goal_dict["lower_is_better"],
         priority=goal_dict.get("priority", 0)
         if goal_dict.["type"] == "Dmax":
-            goal = DMaxClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority)
+            goal = DMaxClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
         elif goal_dict["type"] == "Dmin":
-            goal = DMinClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority)
+            goal = DMinClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
         elif goal_dict["type"] == "Dmean":
-            goal = DMeanClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority)
+            goal = DMeanClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
         elif goal_dict["type"] == "DCC":
             volume = goal_dict["absolute_volume"]
-            goal = DCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better,  priority=priority, **kwargs={'volume': volume})
+            goal = DCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better,  **kwargs={'volume': volume})
         elif goal_dict["type"] == "VCC":
             volume = goal_dict["absolute_volume"]
-            goal = VCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, **kwargs={'volume': volume})
+            goal = VCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, **kwargs={'volume': volume})
         elif goal_dict["type"] == "VX":
             volume = goal_dict["volume"]
             goal = VXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, **kwargs={'volume': volume})
