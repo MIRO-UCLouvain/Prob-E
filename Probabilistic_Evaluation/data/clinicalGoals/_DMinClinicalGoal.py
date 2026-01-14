@@ -18,14 +18,16 @@ class DMinClinicalGoal(AbstractClinicalGoal):
         The mask defining the region of interest for the clinical goal.
     maskName : str
         The name of the mask defining the region of interest for the clinical goal.
+    priority : int
+        The priority level of the clinical goal, zero if no cummulative evaluation is desired.
     valueList : list
         A list to store list of values computed for the clinical goal on each scenario.
     successList : list
         A list to store success status for each scenario.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, maskName, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, priority: int, lower_is_better: bool = False, **kwargs):
+        super().__init__(prescription, mask, maskName, priority, lower_is_better)
 
     def __str__(self):
         if self.lower_is_better:
