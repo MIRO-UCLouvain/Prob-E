@@ -1,5 +1,5 @@
 import json
-from data.clinicalGoals._clinicalGoal import ClinicalGoal
+from Probabilistic_Evaluation.Evaluation.clinicalgoals import *
 
 class clinicalgoalsreader():
 
