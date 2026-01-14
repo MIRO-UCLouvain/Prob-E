@@ -6,4 +6,4 @@ __all__ = [
 
 from . import probabilisticEvaluator
 from . import scenariosGenerator
-import sampling
+from . import sampling

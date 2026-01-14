@@ -1,5 +1,6 @@
 __all__ = ['DCCClinicalGoal', 'DXClinicalGoal', 'VXClinicalGoal', 'VCCClinicalGoal', 'DMaxClinicalGoal', 'DMeanClinicalGoal', 'DMinClinicalGoal']
 
+
 from ._DCCClinicalGoal import DCCClinicalGoal as DCCClinicalGoal
 from ._DXClinicalGoal import DXClinicalGoal as DXClinicalGoal
 from ._VXClinicalGoal import VXClinicalGoal as VXClinicalGoal

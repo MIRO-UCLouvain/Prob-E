@@ -72,7 +72,7 @@ class DicomReader():
                 print(f"RTSTRUCT loaded with {len(RTstruct.name)} structures.")
                 for contour in RTstruct._contours:
                     print(f"Structure: {contour.name}")
-                    RTstruct_dictionary[contour.name] = contour.getBinaryMask(origin=self.CTImage.origin, gridSize=self.CTImage.gridSize, spacing=self.spacing)
+                    RTstruct_dictionary[contour.name] = contour.getBinaryMask(origin=self.CTImage.origin, gridSize=self.CTImage.gridSize, spacing=self.spacing).imageArray
                     
                 return RTstruct_dictionary
         raise ValueError("No RTStruct found in the provided DICOM series.")

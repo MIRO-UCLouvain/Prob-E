@@ -1,7 +1,7 @@
 from scipy.spatial import Voronoi, cKDTree
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data.uncertaintyModel import Gaussian3DUncertaintyModel
-from _abstractSamplingMethod import *
+from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import *
 
 class VoronoiCells(AbstractsamplingMethod):
     """
