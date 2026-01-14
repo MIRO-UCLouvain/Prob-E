@@ -1,7 +1,10 @@
 # Git ingore to ensure sensitive or unnecessary files are not tracked
-
 *.DS_Store
 *.dcm
 *.nii
 *.nii.gz
 Examples/*
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
