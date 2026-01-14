@@ -3,6 +3,7 @@ from Probabilistic_Evaluation.core.voronoiReduction import VoronoiCells
 from Probabilistic_Evaluation.data import PatientData
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data import Scenario
+from Probabilistic_Evaluation.utils import shift_dose_image
 
 class ScenariosGenerator:
     """
@@ -82,7 +83,6 @@ def test_probabilistic_scenarios():
             print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
         if point.tolist() == [0,0,1]:
             print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
-            from Probabilistic_Evaluation.utils import shift_dose_image
             shifted_dose = shift_dose_image(ps.doseImage, shift=point)
             plt.imshow(shifted_dose[:,:,25], cmap='jet')
             plt.colorbar(label='Dose')

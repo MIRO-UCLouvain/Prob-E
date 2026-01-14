@@ -1,4 +1,4 @@
-from Probabilistic_Evaluation.core import ScenariosGenerator
+from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
 import numpy as np
 import pandas as pd
