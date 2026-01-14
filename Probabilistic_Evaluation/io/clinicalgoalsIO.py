@@ -9,20 +9,45 @@ class clinicalgoalsreader():
 
     Attributes
     ----------
-    clinicalgoalpath : str
-        The path to the clinical goals JSON file.
     maskDict : dict
         A dictionary of masks with mask names as keys and mask arrays as values.
+    clinicalgoalpath : str
+        The path to the clinical goals JSON file.
     clinical_goals_dict : dict
         A dictionary to store clinical in dictionary format loaded from the JSON file.
     clinical_goals_list : list
         A list to store all AbstractClinicalGoal objects created from the clinical_goals_dict.
     """
-    def __init__(self, clinicalgoalpath: str, maskDict: dict=None):
-        self.path = clinicalgoalpath
+    def __init__(self, maskDict: dict=None):
         self.maskDict = maskDict
-        self.clinical_goals_list = self.load_clinical_goals()
+        self.path = None
+        self.clinical_goals_dict = None
+        self._clinical_goals_list = None
 
+    @property
+    def maskDict(self) -> dict:
+        return self._maskDict
+    @maskDict.setter
+    def maskDict(self, newMaskDict: dict):
+        self._maskDict = newMaskDict
+    
+    @property
+    def path(self) -> str:
+        return self._path
+    @path.setter
+    def path(self, newPath: str):
+        self._path = newPath
+
+    @property
+    def clinical_goals_list(self) -> list:
+        return self._clinical_goals_list
+    @clinical_goals_list.setter
+    def clinical_goals_list(self, newClinicalGoalsList: list):
+        self._clinical_goals_list = newClinicalGoalsList
+
+    def load_JSON_list(self, clinicalgoalpath: str, ):
+        self.path = clinicalgoalpath
+        self._clinical_goals_listclinical_goals_list = self.load_clinical_goals()
 
     def load_clinical_goals(self):
         goals_dict_list = self.load_json_list()
