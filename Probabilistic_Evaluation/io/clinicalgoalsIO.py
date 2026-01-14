@@ -1,4 +1,5 @@
 import json
+<<<<<<< HEAD
 from data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
 from data.clinicalGoals._DMaxClinicalGoal import DMaxClinicalGoal
 from data.clinicalGoals._DMinClinicalGoal import DMinClinicalGoal
@@ -7,6 +8,9 @@ from data.clinicalGoals._DCCClinicalGoal import DCCClinicalGoal
 from data.clinicalGoals._VCCClinicalGoal import VCCClinicalGoal
 from data.clinicalGoals._VXClinicalGoal import VXClinicalGoal
 from data.clinicalGoals._DXClinicalGoal import DXClinicalGoal
+=======
+from Probabilistic_Evaluation.Evaluation.clinicalgoals import *
+>>>>>>> 009a2dc2f613ae8635e9689a6f45528702098012
 
 class clinicalgoalsreader():
     """

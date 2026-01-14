@@ -1,16 +1,7 @@
-import copy
-import datetime
-import os
-import pydicom
-import numpy as np
-
 from opentps.core.io.dicomIO import *
 from opentps.core.io.dataLoader import *
-from opentps.core.data.images import DoseImage
-from opentps.core.data.images import CTImage
+from opentps.core.data.images import DoseImage, CTImage
 from opentps.core.data import RTStruct
-
-
 
 class DicomReader():
     """

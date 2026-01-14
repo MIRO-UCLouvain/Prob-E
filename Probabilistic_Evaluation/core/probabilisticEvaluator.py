@@ -1,11 +1,6 @@
-from Probabilistic_Evaluation.core import ScenariosGenerator
-from data import DVH
-from data import Scenario
-from data import PatientData
-from data import AbstractClinicalGoal
-from ScenariosGenerator import ScenariosGenerator
+from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
+from Probabilistic_Evaluation.data import PatientData
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 
 class ProbabilisticEvaluator:
@@ -13,7 +8,7 @@ class ProbabilisticEvaluator:
     def __init__(self, PatientData:PatientData, calc_VWMin:bool=False, calc_VWMax:bool=False, calc_CummulPR:bool=False):
         self.patientData = PatientData
         self.scenarios = None
-        self.clinical_goals = self.patientData.clinicalGoalsList 
+        self.clinical_goals = self.patientData.clinicalGoalsList
         self.calc_VWMin = calc_VWMin
         self.calc_VWMax = calc_VWMax
         self.calc_CummulPR = calc_CummulPR
@@ -26,13 +21,13 @@ class ProbabilisticEvaluator:
         self.CummulPR = None
         self.PR = None
 
-    
+
     def evaluate(self):
         self.scenarios = ScenariosGenerator(self.patientData).scenarios_list
-        
+
         for scenario in self.scenarios:
             scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
-            dvh_dict = {}  
+            dvh_dict = {}
             for mask in self.patientData.maskDict.keys():
                 dvh_dict[mask] = DVH(doseImage=scenario.doseImage, structureMask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
             for goal in self.clinical_goals:
@@ -44,8 +39,8 @@ class ProbabilisticEvaluator:
             scenario.delete_doseImage()
         if self.calc_CummulPR:
             self.calc_CummulPR()
-            
-            
+
+
 
     def passingRate_table(self):
         """
@@ -68,7 +63,7 @@ class ProbabilisticEvaluator:
         for goal in self.clinical_goals.values():
             p = 0.0
             for i, s in enumerate(goal.scenariosValuesAchieved):
-                
+
                 if s:
                     p += self.scenarios[i].probability
             PR.append(p)
@@ -83,7 +78,7 @@ class ProbabilisticEvaluator:
         cummul_PR_prev = self.PR[0]
         cummul_PR.append(cummul_PR_prev)
         remaining_succesList = self.clinical_goals[0].succesList
-        while i < len(self.clinical_goals): 
+        while i < len(self.clinical_goals):
             remaining_succesList = [x*y for x,y in (self.clinical_goals[i].succesList,remaining_succesList)]
             cummul_PR_current = sum([self.scenarios[j].probability for j, x in enumerate(remaining_succesList) if x])
 
@@ -96,6 +91,6 @@ class ProbabilisticEvaluator:
             cummul_PR_prev = cummul_PR_current
             i+=1
         self.CummulPR = cummul_PR
-           
 
-   
+
+

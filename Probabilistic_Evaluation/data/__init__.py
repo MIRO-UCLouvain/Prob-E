@@ -9,5 +9,5 @@ __all__ = [
 from ._DVH import DVH
 from ._patientData import PatientData
 from ._scenario import Scenario
-import clinicalGoals
-import uncertaintyModel
+from . import clinicalGoals
+from . import uncertaintyModel

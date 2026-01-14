@@ -4,6 +4,6 @@ __all__ = [
     "voronoiReduction",
 ]
 
-import probabilisticEvaluator
-import scenariosGenerator
-import voronoiReduction
+from . import probabilisticEvaluator
+from . import scenariosGenerator
+from . import voronoiReduction
