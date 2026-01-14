@@ -27,9 +27,21 @@ class AbstractsamplingMethod(ABC):
 
     @abstractmethod
     def MCsampling(self):
+        """
+
+        Returns
+        -------
+
+        """
         pass
 
     @abstractmethod
     def analyticalSampling(self):
+        """
+
+        Returns
+        -------
+
+        """
         pass
 
