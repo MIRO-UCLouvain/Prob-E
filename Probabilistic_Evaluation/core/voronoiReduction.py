@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial import Voronoi, cKDTree
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data.uncertaintyModel import Gaussian3DUncertaintyModel
-from sampling import *
+from Probabilistic_Evaluation.core.sampling import *
 
 
 def gaussian3D(x, y, z, mu=0, sigma=3):

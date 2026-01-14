@@ -10,7 +10,7 @@ class TestScenariosGenerator:
     def test_scenarios_generator_initialization(self):
         pass
 
-    def test_probabilistic_scenarios(self):
+    def test_probabilistic_scenarios(self, plot=True):
         # Example CT and dose images (3D numpy arrays)
         ctImage = np.zeros((50,50,50))
         ctImage[15:35,15:35,15:35] = 100  # Example high-density region
@@ -35,30 +35,32 @@ class TestScenariosGenerator:
         assert len(ps.scenarios_list) == ps.voronoi_cells.points.shape[0]
 
         # print("Evaluation results for all scenarios:", results)
+        
         #2 plots, one showing the results as afucntion of scenario index and other one show probabilities of voronoi cells as function on cell(scenario) index
-        # plt.subplot(1, 1, 1)
-        # plt.plot(ps.voronoi_cells.probabilities_analytical, label='Analytical')
-        # plt.title("Voronoi Cell Probabilities")
-        # plt.xlabel("Voronoi Cell (Scenario) Index")
-        # plt.ylabel("Probability")
-        # plt.legend()
-        # plt.show()
+        if plot:
+            plt.subplot(1, 1, 1)
+            plt.plot(ps.voronoi_cells.probabilities_analytical, label='Analytical')
+            plt.title("Voronoi Cell Probabilities")
+            plt.xlabel("Voronoi Cell (Scenario) Index")
+            plt.ylabel("Probability")
+            plt.legend()
+            plt.show()
 
 
-        # for i, point in enumerate(ps.voronoi_cells.points):
-        #     if point.tolist() == [0,0,0]:
-        #         print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
-        #     if point.tolist() == [0,1,0]:
-        #         print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
-        #     if point.tolist() == [0,0,1]:
-        #         print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
-        #         from Probabilistic_Evaluation.utils import shift_dose_image
-        #         shifted_dose = shift_dose_image(ps.doseImage, shift=point)
-        #         plt.imshow(shifted_dose[:,:,25], cmap='jet')
-        #         plt.colorbar(label='Dose')
-        #         plt.contour(ps.targetMask[:,:,25], colors='white', linewidths=0.5)
-        #         plt.title(f"Dose Distribution for Displacement {point}")
-        #         plt.show()
+            for i, point in enumerate(ps.voronoi_cells.points):
+                if point.tolist() == [0,0,0]:
+                    print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
+                if point.tolist() == [0,1,0]:
+                    print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
+                if point.tolist() == [0,0,1]:
+                    print(f"Scenario {i}: Displacement {point}, Probability: {ps.voronoi_cells.probabilities_analytical[i]}")
+                    from Probabilistic_Evaluation.utils import shift_dose_image
+                    shifted_dose = shift_dose_image(ps.doseImage, shift=point)
+                    plt.imshow(shifted_dose[:,:,25], cmap='jet')
+                    plt.colorbar(label='Dose')
+                    plt.contour(ps.targetMask[:,:,25], colors='white', linewidths=0.5)
+                    plt.title(f"Dose Distribution for Displacement {point}")
+                    plt.show()
 
 if __name__ == "__main__":
-    TestScenariosGenerator.test_probabilistic_scenarios()
+    TestScenariosGenerator().test_probabilistic_scenarios(plot=True)

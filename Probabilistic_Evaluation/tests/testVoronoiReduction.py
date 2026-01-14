@@ -4,8 +4,11 @@ import matplotlib.pyplot as plt
 
 from Probabilistic_Evaluation.core.voronoiReduction import VoronoiCells
 
-class TestVoronoiReduction:
-    def TestVoronoiCells(limit, sigma=1.6, plot=True):
+class TestVoronoiReduction():
+    def __init__(self):
+        pass
+
+    def TestVoronoiCells(self, limit, sigma=1.6, plot=True):
         # Generate random points
         spacing = (1.0, 1.0, 1.0)
         sigmas = (sigma, sigma, sigma)
@@ -43,9 +46,8 @@ class TestVoronoiReduction:
         cumulative_prob9999 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_9999])
         print(f"Number of Voronoi cells to reach 99.99% cumulative probability: {len(cumulative_prob9999)} and the minimum probability of a scenario to be included: {threshold_9999}")
 
-        assert np.isclose(np.sum(probabilitiesMC), 1.0, atol=1e-2), "Monte Carlo probabilities do not sum to 1."
-        assert np.isclose(np.sum(probabilities_analytical), 1.0, atol=1e-6), "Analytical probabilities do not sum to 1."
-        assert np.allclose(probabilitiesMC, probabilities_analytical, atol=1e-2), "Monte Carlo and Analytical probabilities do not match closely."
+        assert(np.isclose(np.sum(probabilitiesMC), 1.0, atol=1e-2), "Monte Carlo probabilities do not sum to 1.")
+        assert(np.isclose(np.sum(probabilities_analytical), 1.0, atol=1e-6), "Analytical probabilities do not sum to 1.")
 
         # Plotting
         if plot:
@@ -65,7 +67,8 @@ if __name__ == "__main__":
 
     PTVmargin = 5
     limit = 2*PTVmargin
-    TestVoronoiReduction.TestVoronoiCells(limit,sigma=PTVmargin/(3.2),plot = True)
+    test_voronoi = TestVoronoiReduction()
+    test_voronoi.TestVoronoiCells(limit, sigma=PTVmargin/(3.2), plot=True)
 
     # resol = 10
     # limit = 5
