@@ -3,6 +3,7 @@ from Probabilistic_Evaluation.core.voronoiReduction import VoronoiCells
 from Probabilistic_Evaluation.data import PatientData
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data import Scenario
+from Probabilistic_Evaluation.utils import shift_dose_image
 
 class ScenariosGenerator:
     """

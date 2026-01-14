@@ -1,7 +1,7 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
-class AbstractsamplingMethod:
+class AbstractsamplingMethod(ABC):
     """
     Abstract base class for sampling methods.
 
