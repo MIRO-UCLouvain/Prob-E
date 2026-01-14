@@ -1,3 +1,5 @@
 from . import dicomIO
 
-__all__ = ["dicomIO"]
+__all__ = ["dicomIO",
+           "clinicalgoalsIO"
+           ]
