@@ -19,6 +19,8 @@ class DXClinicalGoal(AbstractClinicalGoal):
         The mask defining the region of interest for the clinical goal.
     maskName : str
         The name of the mask defining the region of interest for the clinical goal.
+    priority : int
+        The priority level of the clinical goal, zero if no cummulative evaluation is desired.
     valueList : list
         A list to store list of values computed for the clinical goal on each scenario.
     successList : list
@@ -27,8 +29,8 @@ class DXClinicalGoal(AbstractClinicalGoal):
         The volume (in %, e.g. 0.5 for 50%) associated with the clinical goal.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, maskName, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, priority: int, lower_is_better: bool = True, **kwargs):
+        super().__init__(prescription, mask, maskName, priority, lower_is_better)
         self._volume = kwargs.get('volume', None)  # Volume in cc
         if self._volume is None:
             raise ValueError("Volume must be provided for DX ClinicalGoal.")
