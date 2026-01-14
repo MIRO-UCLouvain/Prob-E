@@ -7,6 +7,7 @@ from core.probabilisticEvaluator import ProbabilisticEvaluator
 #Read images from DICOM
 dicom_path = r"C:\Users\geert\OneDrive - UCL\PhD\Probabilistic eval project St.Luc\ORL_001\ORL_001\test"
 clinicalgoalpath = r"C:\Users\geert\OneDrive - UCL\PhD\Probabilistic eval project St.Luc\ORL_001\ORL_001\test\clinicalGoals.json"
+out_path = r"C:\Users\geert\OneDrive - UCL\PhD\Probabilistic eval project St.Luc\ORL_001\ORL_001\test\results.csv"
 reader = DicomReader()
 reader.load_dicom_series(dicom_path)
 clinicalgoals_reader = clinicalgoalsreader(maskDict=reader.RTSTRUCT)
@@ -22,3 +23,4 @@ prob_scenarios_generator.compute_scenarios()
 #create probabilistic evaluator object
 prob_evaluator = ProbabilisticEvaluator(patientData=patient)
 prob_evaluator.evaluate()
+prob_evaluator.write_to_csv(out_path)

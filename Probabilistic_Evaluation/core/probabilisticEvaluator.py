@@ -94,3 +94,19 @@ class ProbabilisticEvaluator:
 
 
 
+    def write_to_csv(self, out_path:str):
+        """
+        Write evaluation results to a CSV file.
+        """
+        data = []
+        for i, goal in enumerate(self.clinical_goals):
+            data.append({
+                'Clinical Goal': goal.__str__(),
+                'Dose treshold': goal.prescription,
+                'Passing Rate': self.PR[i],
+            })
+            if self.calc_CummulPR:
+                data[-1]['Cummulative Passing Rate'] = self.CummulPR[i]
+        
+        df = pd.DataFrame(data)
+        df.to_csv(out_path, index=False)
