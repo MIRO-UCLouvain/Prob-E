@@ -18,6 +18,8 @@ class AbstractClinicalGoal(ABC):
         The mask defining the region of interest for the clinical goal.
     maskName : str
         The name of the mask defining the region of interest for the clinical goal.
+    priority : int
+        The priority level of the clinical goal, zero if no cummulative evaluation is desired.
     valueList : list
         A list to store list of values computed for the clinical goal on each scenario.
     successList : list
@@ -33,13 +35,14 @@ class AbstractClinicalGoal(ABC):
         Method to compute the clinical goal value and success status based on the provided DVH.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, priority: int, lower_is_better: bool = True,**kwargs):
         if prescription < 0:
             raise ValueError("Clinical goal prescription cannot be negative.")
         self._prescription: float = prescription
         self._lower_is_better: bool = lower_is_better
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
+        self._priority: int = priority
         self.valueList: list = []
         self.successList: list = []
 
@@ -87,6 +90,12 @@ class AbstractClinicalGoal(ABC):
     def maskName(self, newMaskName: str):
         self._maskName = newMaskName
 
+    @property
+    def priority(self) -> int:
+        return self._priority
+    @priority.setter
+    def priority(self, newPriority: int):
+        self._priority = newPriority
 
     @abstractmethod
     def __str__(self):
