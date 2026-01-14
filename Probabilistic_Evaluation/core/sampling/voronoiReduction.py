@@ -1,23 +1,9 @@
-import numpy as np
 from scipy.spatial import Voronoi, cKDTree
 import matplotlib.pyplot as plt
 from Probabilistic_Evaluation.data.uncertaintyModel import Gaussian3DUncertaintyModel
-from sampling import *
+from _abstractSamplingMethod import *
 
-
-def gaussian3D(x, y, z, mu=0, sigma=3):
-    """Compute the value of a 3D Gaussian function at point (x, y, z)."""
-    coeff = 1 / ((2 * np.pi) ** 1.5 * sigma ** 3)
-    exponent = -((x - mu) ** 2 + (y - mu) ** 2 + (z - mu) ** 2) / (2 * sigma ** 2)
-    return coeff * np.exp(exponent)
-
-def intergral_gaussian_1D(a, b, mu=0, sigma=3):
-    """Compute the integral of a 1D Gaussian function from a to b."""
-    from scipy.special import erf
-    coeff = 0.5 * (erf((b - mu) / (sigma * np.sqrt(2))) - erf((a - mu) / (sigma * np.sqrt(2))))
-    return coeff
-
-class VoronoiCells(Voronoi, AbstractsamplingMethod):
+class VoronoiCells(AbstractsamplingMethod):
     """
     A class to represent Voronoi cells and compute their probabilities
     based on Monte Carlo simulation and analytical methods (default is analytical).
