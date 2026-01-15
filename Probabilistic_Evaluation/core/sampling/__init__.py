@@ -1,6 +1,6 @@
 __all__ = [
-    "voronoiSampling",
-    "classicalSampling",
+    "VoronoiSampling",
+    "ClassicalSampling",
 ]
 
 
