@@ -1,11 +1,34 @@
-[tool.poetry]
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
 name = "rt-probabilistic-evaluation"
 version = "0.1.0"
 description = "A package for probabilistic evaluation in radiation therapy"
-authors = ["Matijs Geerts","Romain Schyns","Eliot Peeters"]
+authors = [
+  { name = "Matijs Geerts" },
+  { name = "Romain Schyns" },
+  { name = "Eliot Peeters" }
+]
+dependencies = [
+    "numpy>=2.3.2,<3.0",
+    "scipy>=1.11,<2.0",
+]
 
-[tool.poetry.dependencies]
-python = "3.12"
-numpy = "^1.26.4"
-matplotlib = "^3.8.0"
+requires-python = ">=3.12"
 
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.4.0"
+ruff = "^0.0.297"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

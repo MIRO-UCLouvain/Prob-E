@@ -33,6 +33,10 @@ class Scenario(object):
     def displacement(self) -> np.ndarray:
         return self._displacement
 
+    @displacement.setter
+    def displacement(self, newDisplacement: np.ndarray):
+        self._displacement = newDisplacement
+
     @property
     def probability(self) -> float:
         return self._probability
@@ -43,10 +47,12 @@ class Scenario(object):
             raise ValueError("Scenario probability must be between 0 and 1.")
         self._probability = newProbability
 
-    def compute_shifted_image(self,initial_dose_image,displacement: np.ndarray) -> np.ndarray:
+    def compute_shifted_image(self,initial_dose_image,displacement: np.ndarray):
         shift_x, shift_y, shift_z = displacement
         self._doseImage = shift_dose_image(initial_dose_image, shift=(shift_x, shift_y, shift_z))
 
     def delete_doseImage(self):
-        self._doseImage = None
+        if self._doseImage is not None:
+            del self._doseImage
+            self._doseImage = None
 
