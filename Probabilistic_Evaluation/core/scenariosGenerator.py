@@ -11,22 +11,16 @@ class ScenariosGenerator:
     A class to generate and evaluate probabilistic scenarios based on Voronoi cells.
     
     Attributes:
-        ctImage (ndarray): The CT image data.
-        doseImage (ndarray): The dose distribution image data.
-        targetMask (ndarray): The target region mask.
-        displacements (list): List of possible displacements in each dimension.
-        points (ndarray): The generated scenario points.
-        voronoi_cells (VoronoiCells): Voronoi cells object for scenario probabilities.
-    
+    -----------
+    sampling_method : AbstractsamplingMethod
+        The sampling method used to generate scenarios.
+    scenarios_list : list
+        A list of generated scenarios.
+
     Methods:
-        generate_scenario_points():
-            Generate scenario points based on displacements.
-        compute_scenarios():
-            Compute all the scenarios and evaluation metrics.
-        shift_dose_image(doseImage, shift):
-            Shift the dose image by a given displacement.
-        evaluate_scenario(doseImage=None):
-            Evaluate the scenario based on the shifted dose image.
+    --------
+    generate_scenarios():
+        Generates scenarios based on the sampling method.
     """
     def __init__(self,sampling_method:AbstractsamplingMethod):
 
