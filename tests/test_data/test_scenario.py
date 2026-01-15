@@ -70,3 +70,37 @@ def test_compute_shifted_image_updates_dose_image():
     expected_shifted_image = np.roll(initial_dose_image, shift=(1, 1, 1), axis=(0, 1, 2))
     assert np.array_equal(scenario.doseImage, expected_shifted_image)
     assert not np.array_equal(scenario.doseImage, initial_dose_image)
+
+
+def test_compute_shifted_image_with_zero_displacement():
+    initial_dose_image = np.random.rand(10, 10, 10)
+    displacement = np.array([0, 0, 0])
+    scenario = Scenario(displacement=displacement, probability=0.5)
+    scenario.compute_shifted_image(initial_dose_image, displacement)
+    assert scenario.doseImage is not None
+    assert np.array_equal(scenario.doseImage, initial_dose_image)
+
+
+def test_compute_shifted_image_with_negative_displacement():
+    initial_dose_image = np.random.rand(10, 10, 10)
+    displacement = np.array([-1, -1, -1])
+    scenario = Scenario(displacement=displacement, probability=0.5)
+    scenario.compute_shifted_image(initial_dose_image, displacement)
+    assert scenario.doseImage is not None
+    expected_shifted_image = np.roll(initial_dose_image, shift=(-1, -1, -1), axis=(0, 1, 2))
+    assert np.array_equal(scenario.doseImage, expected_shifted_image)
+    assert not np.array_equal(scenario.doseImage, initial_dose_image)
+
+
+def test_compute_shifted_image_non_matching_dimensions():
+    initial_dose_image = np.random.rand(10, 10, 10)
+    displacement = np.array([1, 1])  # Invalid displacement
+    scenario = Scenario(displacement=displacement, probability=0.5)
+    with pytest.raises(ValueError):
+        scenario.compute_shifted_image(initial_dose_image, displacement)
+    scenario.discplacement = np.array([1, 1, 1, 1])  # Invalid displacement
+    with pytest.raises(ValueError):
+        scenario.compute_shifted_image(initial_dose_image, displacement)
+    scenario.displacement = np.array([1])
+    with pytest.raises(ValueError):
+        scenario.compute_shifted_image(initial_dose_image, displacement)
