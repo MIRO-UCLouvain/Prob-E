@@ -26,13 +26,13 @@ class VoronoiSampling(AbstractsamplingMethod):
         Retrieve the precomputed Voronoi points and their probabilities.
     """
 
-    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, bounds: np.ndarray, spacing: np.ndarray):
+    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, max_displacements: np.ndarray, spacing: np.ndarray):
         super().__init__(uncertaintyModel)
-        if bounds.shape != spacing.shape:
-            raise ValueError("Bounds and spacing must have the same shape.")
+        if max_displacements.shape != spacing.shape:
+            raise ValueError("max_displacements and spacing must have the same shape.")
         self._voronoiPoints = None
         self._voronoiProbabilities = None
-        self._generateVoronoiSampling(bounds, spacing, computing_method='analytical')
+        self._generateVoronoiSampling(max_displacements, spacing, computing_method='analytical')
 
     @property
     def voronoiPoints(self) -> np.ndarray:
@@ -42,14 +42,14 @@ class VoronoiSampling(AbstractsamplingMethod):
     def voronoiProbabilities(self) -> np.ndarray:
         return self._voronoiProbabilities
 
-    def _generateVoronoiPoints(self, bounds: np.ndarray, spacing: np.ndarray) -> np.ndarray:
+    def _generateVoronoiPoints(self, max_displacements: np.ndarray, spacing: np.ndarray) -> np.ndarray:
         """
         Generate Voronoi points within the specified bounds and spacing.
 
         Parameters
         ----------
-        bounds : np.ndarray
-            The bounds for generating Voronoi points.
+        max_displacements : np.ndarray
+            The maximum displacements for generating Voronoi points.
         spacing : np.ndarray
             The spacing between Voronoi points.
 
@@ -59,11 +59,11 @@ class VoronoiSampling(AbstractsamplingMethod):
             The generated Voronoi points.
         """
 
-        rounded_bounds = np.around(bounds / spacing)
+        rounded_bounds = np.around(max_displacements / spacing)
         limit_range = [np.arange(-b, b + 1) for b in rounded_bounds]
         XX, YY, ZZ = np.meshgrid(limit_range[0], limit_range[1], limit_range[2])
-        print("Generated points {} for Voronoi Cells with spacing: {}".format(self.displacements.shape[0], spacing))
         voronoiPoints = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
+        print("Generated points {} for Voronoi Cells with spacing: {}".format(voronoiPoints.shape[0], spacing))
         return voronoiPoints
 
     def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = 100000):
@@ -72,7 +72,7 @@ class VoronoiSampling(AbstractsamplingMethod):
 
         Parameters
         ----------
-        vornoiPoints : np.ndarray
+        voronoiPoints : np.ndarray
             The Voronoi points for which to compute probabilities.
         num_samples : int (default=100000)
             The number of Monte Carlo samples to use.
@@ -165,9 +165,9 @@ class VoronoiSampling(AbstractsamplingMethod):
         Returns
         -------
         """
-        vornoiPoints = self._generateVoronoiPoints(bounds, spacing)
-        probabilities = self._generateVoronoiProbabilities(vornoiPoints, computing_method, spacing)
-        self._voronoiPoints = vornoiPoints
+        voronoiPoints = self._generateVoronoiPoints(bounds, spacing)
+        probabilities = self._generateVoronoiProbabilities(voronoiPoints, computing_method, spacing)
+        self._voronoiPoints = voronoiPoints
         self._voronoiProbabilities = probabilities
 
     def MCsampling(self, N_samples: int):
@@ -187,7 +187,8 @@ class VoronoiSampling(AbstractsamplingMethod):
             The probabilities associated with the sampled points.
         """
         Nmax = self._voronoiPoints.shape[0]
-        indexes = np.random.choice(Nmax, probs=self.voronoiProbabilities, size=N_samples)
+        indexes = np.random.choice(Nmax, p=self._voronoiProbabilities, size=N_samples)
+
         samples = self.voronoiPoints[indexes]
         probs = self.voronoiProbabilities[indexes]
         return samples, probs
