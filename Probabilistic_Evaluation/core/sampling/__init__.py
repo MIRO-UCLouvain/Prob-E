@@ -1,7 +1,9 @@
-import voronoiSampling
-import classicalSampling
-
 __all__ = [
     "voronoiSampling",
     "classicalSampling",
 ]
+
+
+from .voronoiSampling import VoronoiSampling
+from .classicalSampling import ClassicalSampling
+

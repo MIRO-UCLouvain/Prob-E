@@ -28,19 +28,15 @@ class ScenariosGenerator:
         evaluate_scenario(doseImage=None):
             Evaluate the scenario based on the shifted dose image.
     """
-    def __init__(self,patientData:PatientData,sampling_method:AbstractsamplingMethod):
+    def __init__(self,sampling_method:AbstractsamplingMethod):
 
-        self.ctImage = patientData.ctImage
-        self.doseImage = patientData.doseImage
-        self.targetMask = patientData.maskDict['Target']
-        self.spacing = patientData.spacing
         self.sampling_method = sampling_method
         self.scenarios_list = []
-        self.generate_scenarios(patientData)
+        self.generate_scenarios()
 
 
-    def generate_scenarios(self,N_scenario):
-        for i in range(N_scenario):
-            displacement, probability = self.sampling_method.analyticalSampling()
-            scenario = Scenario(displacement=displacement, probability=probability)
+    def generate_scenarios(self):
+        displacements, probabilities = self.sampling_method.analyticalSampling()
+        for i in range(len(displacements)):
+            scenario = Scenario(displacement=displacements[i], probability=probabilities[i])
             self.scenarios_list.append(scenario)

@@ -2,24 +2,29 @@ import numpy as np
 import pytest
 import matplotlib.pyplot as plt
 
-from Probabilistic_Evaluation.core.voronoiReduction import VoronoiCells
+from Probabilistic_Evaluation.core.sampling.voronoiSampling import VoronoiSampling
+from Probabilistic_Evaluation.data.uncertaintyModel._Gaussian3D import Gaussian3DUncertaintyModel
 
 class TestVoronoiReduction():
     def __init__(self):
         pass
 
-    def TestVoronoiCells(self, limit, sigma=1.6, plot=True):
+    def TestVoronoiCells(self, limit, sigma=5/3.2, plot=True):
         # Generate random points
-        spacing = (1.0, 1.0, 1.0)
+        bounds = np.array([limit, limit, limit])
+        spacing = np.array([1.0, 1.0, 2.0])
         sigmas = (sigma, sigma, sigma)
         # Create Voronoi cells
-        voronoi_cells = VoronoiCells(limit, spacing, sigmas, method='both')
-
+        UncertaintyModel = Gaussian3DUncertaintyModel(parameters={'mu_x': 0, 'mu_y': 0, 'mu_z': 0,
+                                                                 'sigma_x': sigmas[0],
+                                                                 'sigma_y': sigmas[1],
+                                                                 'sigma_z': sigmas[2]})
+        voronoi_cells = VoronoiSampling(UncertaintyModel, bounds, spacing)
         # Monte Carlo simulation to estimate Voronoi cell probabilities
-        probabilitiesMC = voronoi_cells.probabilitiesMC
+        _, probabilitiesMC = voronoi_cells.MCsampling(N_samples=100000)
         #analytical probabilities
-        probabilities_analytical = voronoi_cells.probabilities_analytical
-        vor_points = voronoi_cells.displacements
+        vor_points, probabilities_analytical = voronoi_cells.analyticalSampling()
+       
         
         print("Voronoi Points and Analytical Probabilities:\n")
         print("vor_ponts.shape:", vor_points.shape)
@@ -46,12 +51,9 @@ class TestVoronoiReduction():
         cumulative_prob9999 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_9999])
         print(f"Number of Voronoi cells to reach 99.99% cumulative probability: {len(cumulative_prob9999)} and the minimum probability of a scenario to be included: {threshold_9999}")
 
-        assert(np.isclose(np.sum(probabilitiesMC), 1.0, atol=1e-2), "Monte Carlo probabilities do not sum to 1.")
-        assert(np.isclose(np.sum(probabilities_analytical), 1.0, atol=1e-6), "Analytical probabilities do not sum to 1.")
-
         # Plotting
         if plot:
-            plt.plot(probabilitiesMC,label='Monte Carlo',color='red')
+            #plt.plot(probabilitiesMC,label='Monte Carlo',color='red')
             plt.plot(probabilities_analytical, label='Analytical',color='blue', linestyle='dashed') #marker = '.')
             plt.hlines(y=points_probabilities[num_cells_95-1,3], xmin=0, xmax=len(probabilities_analytical), colors='green', linestyles='dotted', label='95% Cumulative Probability Threshold')
             plt.hlines(y=points_probabilities[num_cells_97-1,3], xmin=0, xmax=len(probabilities_analytical), colors='orange', linestyles='dotted', label='97% Cumulative Probability Threshold')
