@@ -48,6 +48,8 @@ class PatientData:
 
     @ctImage.setter
     def ctImage(self, newCtImage: np.ndarray):
+        if newCtImage.shape != self._ctImage.shape:
+            raise ValueError("New CT image must have the same dimensions as the existing CT image.")
         self._ctImage = newCtImage
 
     @property
@@ -56,6 +58,8 @@ class PatientData:
 
     @doseImage.setter
     def doseImage(self, newDoseImage: np.ndarray):
+        if newDoseImage.shape != self._doseImage.shape:
+            raise ValueError("New dose image must have the same dimensions as the existing dose image.")
         self._doseImage = newDoseImage
 
     @property
@@ -64,6 +68,9 @@ class PatientData:
 
     @maskDict.setter
     def maskDict(self, newMaskDict: dict):
+        for structureName, mask in newMaskDict.items():
+            if mask.shape != self._ctImage.shape:
+                raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the CT image.")
         self._maskDict = newMaskDict
 
     @property
@@ -76,10 +83,11 @@ class PatientData:
             if dim <= 0:
                 raise ValueError("Spacing values must be positive.")
         self._spacing = newSpacing
+
     @property
     def clinicalGoalsList(self) -> list:
         return self._clinicalGoalsList
-    
+
     @clinicalGoalsList.setter
     def clinicalGoalsList(self, newClinicalGoalsList: list):
         self._clinicalGoalsList = newClinicalGoalsList
@@ -100,7 +108,7 @@ class PatientData:
         """
         goals = [goal for goal in self._clinicalGoalsList if goal.maskName == structureName]
         if not goals:
-            raise ValueError(f"No clinical goals found for structure '{structureName}'.")
+            raise KeyError(f"No clinical goals found for structure '{structureName}'.")
         return goals
 
     def getMask(self, structureName: str) -> np.ndarray:
@@ -119,5 +127,5 @@ class PatientData:
         """
         mask = self._maskDict.get(structureName, None)
         if mask is None:
-            raise ValueError(f"Structure '{structureName}' not found in maskDict.")
+            raise KeyError(f"Structure '{structureName}' not found in maskDict.")
         return mask
