@@ -1,4 +1,5 @@
 import numpy as np
+from Probabilistic_Evaluation.utils import linearInterpolator
 
 
 class DVH(object):
@@ -36,21 +37,26 @@ class DVH(object):
     """
 
     def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0, spacing: tuple = (1.0, 1.0, 1.0)):
+        if dosemap.shape != mask.shape:
+            raise ValueError("Dosemap and mask must have the same shape.")
+        if len(dosemap.shape) != len(spacing):
+            raise ValueError("Spacing must have the same number of dimensions as dosemap.")
+        for dim in spacing:
+            if dim <= 0:
+                raise ValueError("All spacing values must be positive.")
+        if max_DVH <= 0.0:
+            raise ValueError("max_DVH must be a non-negative value.")
         self._dosemap = dosemap
         self._mask = mask
         self._bin_dose = None  # Store bin doses for Dx and Vx calculations, makes Dx calculations easier
         self._dvh = None
         self._maxDVH = max_DVH
-        dmin = np.min(self.dosemap[self.mask.astype(bool)])
-        self._DMin = dmin
-        dmax = np.max(self.dosemap[self.mask.astype(bool)])
-        self._DMax = dmax
-        self.DMax
-        dmean = np.mean(self.dosemap[self.mask.astype(bool)])
-        self._Dmean = dmean
-        self.DMean
+        self._DMin = None
+        self._DMax = None
+        self._DMean = None
         self._spacing = spacing
         self.computeDVH()
+
     @property
     def dosemap(self) -> np.ndarray:
         return self._dosemap
@@ -58,24 +64,15 @@ class DVH(object):
     @dosemap.setter
     def dosemap(self, newDosemap):
         self._dosemap = newDosemap
+        self.computeDVH()
 
     @property
     def mask(self) -> np.ndarray:
         return self._mask
 
-    @mask.setter
-    def mask(self, newMask: np.ndarray):
-        self._mask = newMask
-
     @property
     def maxDVH(self) -> float:
         return self._maxDVH
-
-    @maxDVH.setter
-    def maxDVH(self, newMaxDVH: float):
-        if newMaxDVH <= 0:
-            raise ValueError("maxDVH must be a positive value.")
-        self._maxDVH = newMaxDVH
 
     @property
     def bin_dose(self) -> np.ndarray:
@@ -87,33 +84,24 @@ class DVH(object):
 
     @property
     def DMin(self) -> float:
-        return self._Dmin
-
-    @DMin.setter
-    def DMin(self, newDMin: float):
-        if newDMin < 0:
-            raise ValueError("DMin must be a non-negative value.")
-        self._Dmin = newDMin
+        if self._DMin is None:
+            dose_values = self.dosemap[self.mask.astype(bool)]
+            self._DMin = np.min(dose_values)
+        return self._DMin
 
     @property
     def DMax(self) -> float:
-        return self._Dmax
-
-    @DMax.setter
-    def DMax(self, newDMax: float):
-        if newDMax < 0:
-            raise ValueError("DMax must be a non-negative value.")
-        self._Dmax = newDMax
+        if self._DMax is None:
+            dose_values = self.dosemap[self.mask.astype(bool)]
+            self._DMax = np.max(dose_values)
+        return self._DMax
 
     @property
     def DMean(self) -> float:
-        return self._Dmean
-
-    @DMean.setter
-    def DMean(self, newDMean: float):
-        if newDMean < 0:
-            raise ValueError("DMean must be a non-negative value.")
-        self._Dmean = newDMean
+        if self._DMean is None:
+            dose_values = self.dosemap[self.mask.astype(bool)]
+            self._DMean = np.mean(dose_values)
+        return self._DMean
 
     @property
     def spacing(self) -> tuple:
@@ -145,6 +133,13 @@ class DVH(object):
         dvh = dvh / np.sum(hist) * 100.0  # Normalize to percentage
         self._bin_dose = (bin_edges[:-1] + bin_edges[1:]) / 2.0  # dose at midpoints of bins
         self._dvh = dvh
+
+        # Compute DMin, DMax, DMean before deleting dosemap to free memory
+        DMax = self.DMax
+        DMin = self.DMin
+        DMean = self.DMean
+
+        del self._dosemap
         self._dosemap = None  # free memory
 
     def computeDx(self, x: float) -> float:
@@ -164,9 +159,13 @@ class DVH(object):
             raise ValueError("Volume percentage must be a non-negative value.")
         if x > 1:
             raise ValueError("Volume percentage must be given in percentage (0-1).")
-        diff_array = np.abs(self.dvh - x*100.0)
-        index = np.argmin(diff_array)
-        return self.bin_dose[index]
+        target = x * 100.0
+
+        # DVH is decreasing with dose → reverse for interpolation
+        dvh_rev = self.dvh[::-1]
+        dose_rev = self.bin_dose[::-1]
+
+        return linearInterpolator(target, dvh_rev, dose_rev)
 
     def computeVx(self, x: float) -> float:
         """
@@ -183,9 +182,7 @@ class DVH(object):
         """
         if x < 0:
             raise ValueError("Dose must be a non-negative value.")
-        diff_array = np.abs(self.bin_dose - x)
-        index = np.argmin(diff_array)
-        return self.dvh[index]
+        return linearInterpolator(x, self.bin_dose, self.dvh)
 
     def computeDcc(self, x: float) -> float:
         """
@@ -202,11 +199,17 @@ class DVH(object):
         """
         if x < 0:
             raise ValueError("Absolute volume must be a non-negative value.")
-        total_volume_cc = np.sum(self.mask.astype(bool))*np.prod(self.spacing)/1000.0  # convert mm^3 to cc
-        volume_percentage = (x / total_volume_cc) * 100.0
-        diff_array = np.abs(self.dvh - volume_percentage)
-        index = np.argmin(diff_array)
-        return self.bin_dose[index]
+
+        total_volume_cc = np.sum(self.mask.astype(bool)) * np.prod(self.spacing) / 1000.0  # convert mm^3 to cc
+        if x > total_volume_cc:
+            raise ValueError("Absolute volume exceeds total volume of the structure.")
+
+        target_percentage = (x / total_volume_cc) * 100.0
+
+        dvh_rev = self.dvh[::-1]
+        dose_rev = self.bin_dose[::-1]
+
+        return linearInterpolator(target_percentage, dvh_rev, dose_rev)
 
     def computeVcc(self, x: float) -> float:
         """
@@ -223,9 +226,8 @@ class DVH(object):
         """
         if x < 0:
             raise ValueError("Dose must be a non-negative value.")
-        diff_array = np.abs(self.bin_dose - x)
-        index = np.argmin(diff_array)
-        volume_percentage = self.dvh[index]
-        total_volume_cc = np.sum(self.mask.astype(bool))*np.prod(self.spacing)/1000.0  # convert mm^3 to cc
-        absolute_volume_cc = (volume_percentage / 100.0) * total_volume_cc
-        return absolute_volume_cc
+        volume_percentage = linearInterpolator(x, self.bin_dose, self.dvh)
+
+        total_volume_cc = (np.sum(self.mask.astype(bool)) * np.prod(self.spacing) / 1000.0)
+
+        return (volume_percentage / 100.0) * total_volume_cc
