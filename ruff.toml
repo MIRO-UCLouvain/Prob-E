@@ -8,16 +8,16 @@ respect-gitignore = true
 target-version = "py312"
 
 # set line length
-line-length = 300 #we do not want Ruff do interfere with long imports
+line-length = 200 #we do not want Ruff do interfere with long imports
 
 
 # select specific rules to enable
 [lint]
 select = [
-    #"E", # All pycodestyle errors
-    #"F", # All pyflakes errors
-    #"W", # All pycodestyle warnings
-    #"I", # Import-related rules
+    "E", # All pycodestyle errors
+    "F", # All pyflakes errors
+    "W", # All pycodestyle warnings
+    "I", # Import-related rules
     "D", # Docstring-related rules
 ]
 

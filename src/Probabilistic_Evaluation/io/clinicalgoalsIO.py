@@ -19,6 +19,7 @@ class clinicalgoalsreader():
     clinical_goals_list : list
         A list to store all AbstractClinicalGoal objects created from the clinical_goals_dict.
     """
+
     def __init__(self, maskDict: dict=None):
         self._maskDict = maskDict
         self._path = None

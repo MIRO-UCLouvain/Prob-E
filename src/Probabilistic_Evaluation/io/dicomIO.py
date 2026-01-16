@@ -6,12 +6,15 @@ from opentps.core.data import RTStruct
 class DicomReader():
     """
     A class to read and process DICOM files including CT images, RTSTRUCT, and RTDOSE.
-    Attributes:
+
+    Attributes
+    ----------
         CT (ndarray): The CT image data.
         RTSTRUCT (dict): The RT structure data.
         RTDOSE (ndarray): The RT dose image data.
         spacing (tuple): The spacing of the CT image.
     """
+
     def __init__(self):
         self.CT: np.ndarray = None
         self.RTSTRUCT: dict = None
@@ -25,7 +28,9 @@ class DicomReader():
 
         Args:
             directory (str): Path to the directory containing DICOM files.
-        Returns:
+
+        Returns
+        -------
             list: List of pydicom Dataset objects sorted by InstanceNumber.
         """
         self.data = readData(directory)

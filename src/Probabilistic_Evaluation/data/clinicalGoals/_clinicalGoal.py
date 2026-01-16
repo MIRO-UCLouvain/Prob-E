@@ -103,6 +103,7 @@ class AbstractClinicalGoal(ABC):
     def compute_value(self, dvh) -> float:
         """
         Compute the value of the clinical goal based on the provided DVH.
+
         Parameters
         ----------
         dvh

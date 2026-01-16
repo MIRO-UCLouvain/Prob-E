@@ -37,6 +37,7 @@ class DMeanClinicalGoal(AbstractClinicalGoal):
     def compute_value(self, dvh) -> float:
         """
         Compute the mean dose from the DVH.
+
         Parameters
         ----------
         dvh : DVH

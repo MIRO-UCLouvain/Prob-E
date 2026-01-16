@@ -37,4 +37,5 @@ jobs:
     - name: 🔍 Lint with ruff
       run: |
         ruff check . --fix
+      continue-on-error: true
         

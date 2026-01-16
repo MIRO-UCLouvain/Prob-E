@@ -8,6 +8,7 @@ from ._abstractUncertaintyModel import AbstractUncertaintyModel
 class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
     """
     A class to represent a 3D Gaussian uncertainty model.
+
     ! ASSUMING INDEPENDENT DIMENSIONS !
 
     Attributes
@@ -21,7 +22,7 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         - 'mu_z': Mean in z direction (default: 0)
         - 'sigma_x': Standard deviation in x direction (default: 5/3.2)
         - 'sigma_y': Standard deviation in y direction (default: 5/3.2)
-        - 'sigma_z': Standard deviation in z direction (default: 5/3.2)
+        - 'sigma_z': Standard deviation in z direction (default: 5/3.2).
     """
 
     def __init__(self, parameters: dict = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': 5 / (3.2), 'sigma_y': 5 / (3.2),
@@ -117,6 +118,7 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
     def boundedIntegral(self, a, b):
         """
         Compute the integral of the 3D Gaussian function over the bounded region defined by a and b.
+
         If the mean is zero in all dimensions, the integral is computed as the product of 1D integrals.
 
         Parameters

@@ -28,20 +28,22 @@ class AbstractsamplingMethod(ABC):
     @abstractmethod
     def MCsampling(self,**kwargs):
         """
+        Abstract method for Monte Carlo sampling.
 
         Returns
         -------
-
+        None.
         """
         pass
 
     @abstractmethod
     def analyticalSampling(self,**kwargs):
         """
+        Abstract method for analytical sampling.
 
         Returns
         -------
-
+        None.
         """
         pass
 

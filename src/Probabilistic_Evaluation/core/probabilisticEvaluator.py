@@ -80,7 +80,7 @@ class ProbabilisticEvaluator:
 
     def calculate_cummul_PR(self):
         """
-        need some form of prioritization of clinical goals to calculate a cummulative passing rate
+        Need some form of prioritization of clinical goals to calculate a cummulative passing rate
         """
         cummul_PR = []
         i=1

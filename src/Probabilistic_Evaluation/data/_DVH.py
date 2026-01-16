@@ -5,6 +5,7 @@ from Probabilistic_Evaluation.utils import linearInterpolator
 class DVH(object):
     """
     Class to compute Dose-Volume Histogram (DVH) from dose distribution and a mask.
+
     Attributes
     ----------
     dosemap : np.ndarray
@@ -118,7 +119,6 @@ class DVH(object):
     def computeDVH(self):
         """
         Compute Dose-Volume Histogram (DVH) for a given mask.
-
         """
         n_bins = 4096
         mask = self.mask.astype(bool)
@@ -145,6 +145,7 @@ class DVH(object):
     def computeDx(self, x: float) -> float:
         """
         Compute the dose at which x% of the volume receives at least that dose.
+
         Parameters
         ----------
         x : float
@@ -172,6 +173,7 @@ class DVH(object):
     def computeVx(self, x: float) -> float:
         """
         Compute the volume percentage receiving at least x Gy dose.
+
         Parameters
         ----------
         x : float
@@ -189,6 +191,7 @@ class DVH(object):
     def computeDcc(self, x: float) -> float:
         """
         Compute the dose at which x cc of the volume receives at least that dose.
+
         Parameters
         ----------
         x : float
@@ -218,6 +221,7 @@ class DVH(object):
     def computeVcc(self, x: float) -> float:
         """
         Compute the absolute volume in cc receiving at least x Gy dose.
+
         Parameters
         ----------
         x : float

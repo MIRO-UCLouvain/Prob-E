@@ -54,6 +54,7 @@ class DCCClinicalGoal(AbstractClinicalGoal):
     def compute_value(self, dvh) -> float:
         """
         Compute the dose corresponding to the specified volume from the DVH.
+
         Parameters
         ----------
         dvh : DVH

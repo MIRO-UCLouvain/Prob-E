@@ -26,7 +26,6 @@ class VCCClinicalGoal(AbstractClinicalGoal):
         The dose (in Gy) associated with the clinical goal.
     """
 
-
     def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
         super().__init__(prescription, mask, maskName, lower_is_better)
         self._dose = kwargs.get('dose', None)  # Dose in Gy
@@ -54,6 +53,7 @@ class VCCClinicalGoal(AbstractClinicalGoal):
     def compute_value(self, dvh) -> float:
         """
         Compute the dose corresponding to the specified volume from the DVH.
+
         Parameters
         ----------
         dvh : DVH

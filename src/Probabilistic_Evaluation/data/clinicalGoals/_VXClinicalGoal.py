@@ -56,6 +56,7 @@ class VXClinicalGoal(AbstractClinicalGoal):
     def compute_value(self, dvh) -> float:
         """
         Compute the volume percentage corresponding to the specified dose from the DVH.
+
         Parameters
         ----------
         dvh : DVH
