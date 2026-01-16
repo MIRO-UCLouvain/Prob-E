@@ -32,7 +32,7 @@ jobs:
 
     - name: 🔍 format with ruff
       run: |
-        ruff format --fix .
+        ruff format .
 
     - name: 🔍 Lint with ruff
       run: |
