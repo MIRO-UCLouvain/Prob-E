@@ -1,7 +1,8 @@
 import numpy as np
-from scipy.spatial import Voronoi, cKDTree
 
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
+from Probabilistic_Evaluation.data.uncertaintyModel._abstractUncertaintyModel import AbstractUncertaintyModel
+
 
 
 class ClassicalSampling(AbstractsamplingMethod):
@@ -15,16 +16,16 @@ class ClassicalSampling(AbstractsamplingMethod):
         The uncertainty model used for sampling.
     """
 
-    def __init__(self, uncertaintyModel: AbstractsamplingMethod):
+    def __init__(self, uncertaintyModel: AbstractUncertaintyModel):
         super().__init__(uncertaintyModel)
 
-    def MCsampling(self, N_samples: int):
+    def MCsampling(self, **kwargs):
         """
         Sample the uncertainty model using Monte Carlo sampling.
 
         Parameters
         ----------
-        N_samples : int
+        N_samples : int (default: 1000)
             The number of samples to draw.
 
         Returns
@@ -34,11 +35,12 @@ class ClassicalSampling(AbstractsamplingMethod):
         probs : np.ndarray
             The probabilities associated with each sampled point (1/N_samples).
         """
+        N_samples = kwargs.get('N_samples', 1000)
         samples = self.UncertaintyModel.sample(N_samples)
         probs = np.ones(N_samples) / N_samples
         return samples, probs
 
-    def analyticalSampling(self, N_points_per_dim: int, bounds: np.ndarray):
+    def analyticalSampling(self, **kwargs):
         """
         Sample the uncertainty model using analytical sampling.
         Creates a grid of points within the specified bounds and evaluates
@@ -46,9 +48,9 @@ class ClassicalSampling(AbstractsamplingMethod):
 
         Parameters
         ----------
-        N_points_per_dim : int
+        N_points_per_dim : int (default: 10)
             The number of points to sample per dimension.
-        bounds : np.ndarray
+        bounds : np.ndarray (default: np.array([5.0, 5.0, 5.0]))
             The bounds for sampling in each dimension.
 
         Returns
@@ -58,6 +60,8 @@ class ClassicalSampling(AbstractsamplingMethod):
         probabilities : np.ndarray
             The probabilities associated with each sampled point.
         """
+        N_points_per_dim = kwargs.get('N_points_per_dim', 10)
+        bounds = kwargs.get('bounds', np.array([5.0, 5.0, 5.0]))
         limit_range = [np.linspace(-b, b, N_points_per_dim) for b in bounds]
         XX, YY, ZZ = np.meshgrid(limit_range[0], limit_range[1], limit_range[2])
         points = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
