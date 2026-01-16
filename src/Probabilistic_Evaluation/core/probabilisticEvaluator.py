@@ -1,12 +1,15 @@
+from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
 from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
+from Probabilistic_Evaluation.data import DVH
 import numpy as np
 import pandas as pd
 
 class ProbabilisticEvaluator:
 
-    def __init__(self, PatientData:PatientData, calc_VWMin:bool=False, calc_VWMax:bool=False, calc_CummulPR:bool=False):
+    def __init__(self, PatientData:PatientData, sampler:AbstractsamplingMethod, calc_VWMin:bool=False, calc_VWMax:bool=False, calc_CummulPR:bool=False):
         self.patientData = PatientData
+        self.sampler = sampler
         self.scenarios = None
         self.clinical_goals = self.patientData.clinicalGoalsList
         self.calc_VWMin = calc_VWMin
@@ -23,15 +26,15 @@ class ProbabilisticEvaluator:
 
 
     def evaluate(self):
-        self.scenarios = ScenariosGenerator(self.patientData).scenarios_list
+        self.scenarios = ScenariosGenerator(sampling_method=self.sampler).scenarios_list
 
         for scenario in self.scenarios:
             scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
             dvh_dict = {}
             for mask in self.patientData.maskDict.keys():
-                dvh_dict[mask] = DVH(doseImage=scenario.doseImage, structureMask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
+                dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
             for goal in self.clinical_goals:
-                goal.computevalue(dvh_dict[goal.maskName])
+                goal.compute_value(dvh_dict[goal.maskName])
             if self.calc_VWMin:
                 self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
             if self.calc_VWMax:

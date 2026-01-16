@@ -45,7 +45,6 @@ class DVH(object):
         self._DMin = dmin
         dmax = np.max(self.dosemap[self.mask.astype(bool)])
         self._DMax = dmax
-        self.DMax
         dmean = np.mean(self.dosemap[self.mask.astype(bool)])
         self._Dmean = dmean
         self.DMean
@@ -97,7 +96,7 @@ class DVH(object):
 
     @property
     def DMax(self) -> float:
-        return self._Dmax
+        return self._DMax
 
     @DMax.setter
     def DMax(self, newDMax: float):

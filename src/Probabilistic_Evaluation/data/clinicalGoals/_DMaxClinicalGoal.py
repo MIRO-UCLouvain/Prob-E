@@ -50,5 +50,5 @@ class DMaxClinicalGoal(AbstractClinicalGoal):
         float
             The computed maximum dose value.
         """
-        value  = dvh.Dmax()
+        value  = dvh.DMax
         return value

@@ -50,5 +50,5 @@ class DMinClinicalGoal(AbstractClinicalGoal):
         float
             The computed DMin value.
         """
-        value  = dvh.DMin()
+        value  = dvh.DMin
         return value
