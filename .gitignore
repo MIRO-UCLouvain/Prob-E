@@ -4,7 +4,7 @@
 *.nii
 *.nii.gz
 Examples/*
-
+demo
 # Ignore Python cache files
 __pycache__/
 *.py[cod]
