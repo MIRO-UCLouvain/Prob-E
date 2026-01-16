@@ -95,7 +95,6 @@ class DVH(object):
 
     @property
     def DMax(self) -> float:
-<<<<<<< HEAD
         return self._DMax
 
     @DMax.setter
@@ -103,12 +102,6 @@ class DVH(object):
         if newDMax < 0:
             raise ValueError("DMax must be a non-negative value.")
         self._Dmax = newDMax
-=======
-        if self._DMax is None:
-            dose_values = self.dosemap[self.mask.astype(bool)]
-            self._DMax = np.max(dose_values)
-        return self._DMax
->>>>>>> 5fd0e60ef8457b916a8b2d5a022b1e5acd81b501
 
     @property
     def DMean(self) -> float:
