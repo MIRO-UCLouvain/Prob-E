@@ -170,13 +170,13 @@ class VoronoiSampling(AbstractsamplingMethod):
         self._voronoiPoints = voronoiPoints
         self._voronoiProbabilities = probabilities
 
-    def MCsampling(self, N_samples: int):
+    def MCsampling(self, **kwargs):
         """
         Perform Monte Carlo sampling based on the Voronoi points and their probabilities.
 
         Parameters
         ----------
-        N_samples : int
+        N_samples : int (default: 1000)
             The number of samples to generate.
 
         Returns
@@ -186,6 +186,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         probs : np.ndarray
             The probabilities associated with the sampled points.
         """
+        N_samples = kwargs.get('N_samples', 1000)
         Nmax = self._voronoiPoints.shape[0]
         indexes = np.random.choice(Nmax, p=self._voronoiProbabilities, size=N_samples)
 
@@ -193,7 +194,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         probs = self.voronoiProbabilities[indexes]
         return samples, probs
 
-    def analyticalSampling(self):
+    def analyticalSampling(self, **kwargs):
         """
         Retrieve the precomputed Voronoi points and their probabilities.
 
