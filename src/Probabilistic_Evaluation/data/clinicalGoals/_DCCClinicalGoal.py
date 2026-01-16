@@ -10,9 +10,7 @@ class DCCClinicalGoal(AbstractClinicalGoal):
     ----------
     prescription : float
         The prescribed dose value for the clinical goal.
-    value : float
-        The evaluated value for the clinical goal.
-    lower_is_better : bool
+    lower_is_better : bool (default=True)
         Indicates if lower values are better for this goal.
     mask : np.ndarray
         The mask defining the region of interest for the clinical goal.
@@ -28,8 +26,8 @@ class DCCClinicalGoal(AbstractClinicalGoal):
         The volume (in cc) associated with the clinical goal.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, priority: int, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, maskName, priority, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
+        super().__init__(prescription, mask, maskName, lower_is_better)
         self._volume = kwargs.get('volume', None)  # Volume in cc
         if self._volume is None:
             raise ValueError("Volume must be provided for DCC ClinicalGoal.")
