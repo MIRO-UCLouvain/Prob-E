@@ -26,7 +26,7 @@ class AbstractsamplingMethod(ABC):
         self.UncertaintyModel = uncertaintyModel
 
     @abstractmethod
-    def MCsampling(self):
+    def MCsampling(self,**kwargs):
         """
 
         Returns
@@ -36,7 +36,7 @@ class AbstractsamplingMethod(ABC):
         pass
 
     @abstractmethod
-    def analyticalSampling(self):
+    def analyticalSampling(self,**kwargs):
         """
 
         Returns

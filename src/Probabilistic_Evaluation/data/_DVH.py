@@ -56,8 +56,7 @@ class DVH(object):
         dmax = np.max(self.dosemap[self.mask.astype(bool)])
         self._DMax = dmax
         dmean = np.mean(self.dosemap[self.mask.astype(bool)])
-        self._Dmean = dmean
-        self.DMean
+        self._DMean = dmean
         self._spacing = spacing
         self.computeDVH()
 
