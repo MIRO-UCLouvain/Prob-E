@@ -51,13 +51,9 @@ class DVH(object):
         self._bin_dose = None  # Store bin doses for Dx and Vx calculations, makes Dx calculations easier
         self._dvh = None
         self._maxDVH = max_DVH
-        dmin = np.min(self.dosemap[self.mask.astype(bool)])
-        self._DMin = dmin
-        dmax = np.max(self.dosemap[self.mask.astype(bool)])
-        self._DMax = dmax
-        dmean = np.mean(self.dosemap[self.mask.astype(bool)])
-        self._Dmean = dmean
-        self.DMean
+        self._DMin = None
+        self._DMax = None
+        self._DMean = None
         self._spacing = spacing
         self.computeDVH()
 
@@ -95,13 +91,10 @@ class DVH(object):
 
     @property
     def DMax(self) -> float:
+        if self._DMax is None:
+            dose_values = self.dosemap[self.mask.astype(bool)]
+            self._DMax = np.max(dose_values)
         return self._DMax
-
-    @DMax.setter
-    def DMax(self, newDMax: float):
-        if newDMax < 0:
-            raise ValueError("DMax must be a non-negative value.")
-        self._Dmax = newDMax
 
     @property
     def DMean(self) -> float:
