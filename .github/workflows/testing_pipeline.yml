@@ -3,7 +3,7 @@ run-name: Setup Python and run tests
 on:
   push:
     branches:
-      - all
+      - "**"
   pull_request:
     branches:
       - main
