@@ -29,36 +29,45 @@ class TestVoronoiReduction():
         print("Voronoi Points and Analytical Probabilities:\n")
         print("vor_ponts.shape:", vor_points.shape)
         print("probabilities_analytical.shape:", probabilities_analytical.shape)
-        points_probabilities = np.hstack((vor_points, probabilities_analytical.reshape(-1, 1)))
-        # sort by probabilities
-        points_probabilities = points_probabilities[np.argsort(points_probabilities[:, 3])[::-1]]
-        #take the proabibilities needed to reach 95% of cumulative probability
-        cumulative_prob = np.cumsum(points_probabilities[:, 3])
-        num_cells_95 = np.searchsorted(cumulative_prob, 0.95,side='right') + 1
-        threshold_95 = points_probabilities[num_cells_95-1,3]
-        cumulative_prob95 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_95])
-        print(f"Number of Voronoi cells to reach 95% cumulative probability: {len(cumulative_prob95)} and the minimum probability of a scenario to be included: {threshold_95}")
-        num_cells_97 = np.searchsorted(cumulative_prob, 0.97,side='right') + 1
-        threshold_97 = points_probabilities[num_cells_97-1,3]
-        cumulative_prob97 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_97])
-        print(f"Number of Voronoi cells to reach 97% cumulative probability: {len(cumulative_prob97)} and the minimum probability of a scenario to be included: {threshold_97}")
-        num_cells_99 = np.searchsorted(cumulative_prob, 0.99,side='right') + 1
-        threshold_99 = points_probabilities[num_cells_99-1,3]
-        cumulative_prob99 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_99])
-        print(f"Number of Voronoi cells to reach 99% cumulative probability: {len(cumulative_prob99)} and the minimum probability of a scenario to be included: {threshold_99}")
-        num_cells_9999 = np.searchsorted(cumulative_prob, 0.9999,side='right') + 1
-        threshold_9999 = points_probabilities[num_cells_9999-1,3]
-        cumulative_prob9999 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_9999])
-        print(f"Number of Voronoi cells to reach 99.99% cumulative probability: {len(cumulative_prob9999)} and the minimum probability of a scenario to be included: {threshold_9999}")
+        # points_probabilities = np.hstack((vor_points, probabilities_analytical.reshape(-1, 1)))
+        # # sort by probabilities
+        # points_probabilities = points_probabilities[np.argsort(points_probabilities[:, 3])[::-1]]
+        # #take the proabibilities needed to reach 95% of cumulative probability
+        # cumulative_prob = np.cumsum(points_probabilities[:, 3])
+        # num_cells_95 = np.searchsorted(cumulative_prob, 0.95,side='right') + 1
+        # threshold_95 = points_probabilities[num_cells_95-1,3]
+        # cumulative_prob95 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_95])
+        # print(f"Number of Voronoi cells to reach 95% cumulative probability: {len(cumulative_prob95)} and the minimum probability of a scenario to be included: {threshold_95}")
+        # num_cells_97 = np.searchsorted(cumulative_prob, 0.97,side='right') + 1
+        # threshold_97 = points_probabilities[num_cells_97-1,3]
+        # cumulative_prob97 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_97])
+        # print(f"Number of Voronoi cells to reach 97% cumulative probability: {len(cumulative_prob97)} and the minimum probability of a scenario to be included: {threshold_97}")
+        # num_cells_99 = np.searchsorted(cumulative_prob, 0.99,side='right') + 1
+        # threshold_99 = points_probabilities[num_cells_99-1,3]
+        # cumulative_prob99 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_99])
+        # print(f"Number of Voronoi cells to reach 99% cumulative probability: {len(cumulative_prob99)} and the minimum probability of a scenario to be included: {threshold_99}")
+        # num_cells_9999 = np.searchsorted(cumulative_prob, 0.9999,side='right') + 1
+        # threshold_9999 = points_probabilities[num_cells_9999-1,3]
+        # cumulative_prob9999 = np.cumsum(points_probabilities[:, 3][points_probabilities[:, 3]>=threshold_9999])
+        # print(f"Number of Voronoi cells to reach 99.99% cumulative probability: {len(cumulative_prob9999)} and the minimum probability of a scenario to be included: {threshold_9999}")
 
+        #reduce number of scenarios based on cumulative probability
+        vorpoints_reduced_95, probabilities_reduced_95 = voronoi_cells.reduceNumberOfScenarios(cumulative_probability=0.95)
+        print(f"Number of Voronoi cells to reach 95% cumulative probability: {len(probabilities_reduced_95)}")
+        vorpoints_reduced_97, probabilities_reduced_97 = voronoi_cells.reduceNumberOfScenarios(cumulative_probability=0.97)
+        print(f"Number of Voronoi cells to reach 97% cumulative probability: {len(probabilities_reduced_97)}")
+        vorpoints_reduced_99, probabilities_reduced_99 = voronoi_cells.reduceNumberOfScenarios(cumulative_probability=0.99)
+        print(f"Number of Voronoi cells to reach 99% cumulative probability: {len(probabilities_reduced_99)}")
+        vorpoints_reduced_9999, probabilities_reduced_9999 = voronoi_cells.reduceNumberOfScenarios(cumulative_probability=0.9999)
+        print(f"Number of Voronoi cells to reach 99.99% cumulative probability: {len(probabilities_reduced_9999)}")
         # Plotting
         if plot:
             #plt.plot(probabilitiesMC,label='Monte Carlo',color='red')
             plt.plot(probabilities_analytical, label='Analytical',color='blue', linestyle='dashed') #marker = '.')
-            plt.hlines(y=points_probabilities[num_cells_95-1,3], xmin=0, xmax=len(probabilities_analytical), colors='green', linestyles='dotted', label='95% Cumulative Probability Threshold')
-            plt.hlines(y=points_probabilities[num_cells_97-1,3], xmin=0, xmax=len(probabilities_analytical), colors='orange', linestyles='dotted', label='97% Cumulative Probability Threshold')
-            plt.hlines(y=points_probabilities[num_cells_99-1,3], xmin=0, xmax=len(probabilities_analytical), colors='purple', linestyles='dotted', label='99% Cumulative Probability Threshold')
-            plt.hlines(y=points_probabilities[num_cells_9999-1,3], xmin=0, xmax=len(probabilities_analytical), colors='brown', linestyles='dotted', label='99.99% Cumulative Probability Threshold')
+            plt.hlines(y=np.min(probabilities_reduced_95), xmin=0, xmax=len(probabilities_analytical), colors='green', linestyles='dotted', label='95% Cumulative Probability Threshold')
+            plt.hlines(y=np.min(probabilities_reduced_97), xmin=0, xmax=len(probabilities_analytical), colors='orange', linestyles='dotted', label='97% Cumulative Probability Threshold')
+            plt.hlines(y=np.min(probabilities_reduced_99), xmin=0, xmax=len(probabilities_analytical), colors='purple', linestyles='dotted', label='99% Cumulative Probability Threshold')
+            plt.hlines(y=np.min(probabilities_reduced_9999), xmin=0, xmax=len(probabilities_analytical), colors='brown', linestyles='dotted', label='99.99% Cumulative Probability Threshold')
             plt.xlabel('Voronoi Cell Index')
             plt.ylabel('Probability')
             plt.title('Voronoi Cell Probabilities: Monte Carlo vs Analytical')
