@@ -164,8 +164,10 @@ class DVH(object):
         # DVH is decreasing with dose → reverse for interpolation
         dvh_rev = self.dvh[::-1]
         dose_rev = self.bin_dose[::-1]
-
-        return linearInterpolator(target, dvh_rev, dose_rev)
+        Dx = linearInterpolator(target, dvh_rev, dose_rev)
+        if Dx>self.DMax:
+            Dx = self.DMax
+        return Dx
 
     def computeVx(self, x: float) -> float:
         """
@@ -208,8 +210,10 @@ class DVH(object):
 
         dvh_rev = self.dvh[::-1]
         dose_rev = self.bin_dose[::-1]
-
-        return linearInterpolator(target_percentage, dvh_rev, dose_rev)
+        Dcc = linearInterpolator(target_percentage, dvh_rev, dose_rev)
+        if Dcc>self.DMax:
+            Dcc = self.DMax
+        return Dcc
 
     def computeVcc(self, x: float) -> float:
         """
