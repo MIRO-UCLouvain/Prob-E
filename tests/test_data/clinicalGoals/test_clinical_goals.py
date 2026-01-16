@@ -54,7 +54,7 @@ def test_clinical_goals_instantiation(goal_classes, example_parameters):
         assert goal_instance.maskName == maskName
         assert goal_instance.mask is mask
         if goal_class is DMinClinicalGoal:
-            assert goal_instance.lower_is_better is False  # specificfor DMinClinicalGoal
+            assert goal_instance.lower_is_better is False  # specific for DMinClinicalGoal
         else:
             assert goal_instance.lower_is_better is True  # default value
 
