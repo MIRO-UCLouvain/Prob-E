@@ -78,22 +78,24 @@ class clinicalgoalsreader():
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority", 0)
-        if goal_dict["type"] in ["Dmax", "dmax", "DMax", "dMax"]:         
+        type = goal_dict["type"].upper()
+     
+        if type == "DMAX":         
             goal = DMaxClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] in ["Dmin", "dmin", "DMin", "dMin"]:       
+        elif type == "DMIN":       
             goal = DMinClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] in ["Dmean", "dmean", "DMean", "dMean"]:       
+        elif type == "DMEAN":       
             goal = DMeanClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] in ["Dxcc", "dxcc", "DXCC", "dXcc", "DxCC", "dXCC", "DXcc", "dxCC"]:         
+        elif type == "DXCC":         
             volume = goal_dict["absolute_volume"]
             goal = DCCClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better,  volume=volume)
-        elif goal_dict["type"] in ["Vxcc", "vxcc", "VXCC", "vXcc", "VxCC", "vxCC", "VXcc", "vXCC"]: 
+        elif type == "VXCC": 
             volume = goal_dict["absolute_volume"]
             goal = VCCClinicalGoal(prescription=volume, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, dose=dose)
-        elif goal_dict["type"] in ["Vx", "vx", "VX", "vX"]:
+        elif type == "VX":
             volume = goal_dict["volume"]/100.0
             goal = VXClinicalGoal(prescription=volume, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, dose=dose)
-        elif goal_dict["type"] in ["Dx", "dx", "DX", "dX"]:
+        elif type == "DX":
             volume = goal_dict["volume"]/100.0
             goal = DXClinicalGoal(prescription=dose, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, volume=volume)
         else:
@@ -105,8 +107,3 @@ class clinicalgoalsreader():
             goals = json.load(f)
         return goals
     
-
-if __name__ == "__main__":
-    path = r"C:\Users\matigeerts\OneDrive - UCL\PhD\Probabilistic eval project St.Luc\ORL_001\ORL_001\test\testgoals.json"
-    reader = clinicalgoalsreader({"PTV": None, "Brainstem": None, "SpinalCord": None})
-    reader.load_JSON_list(path)
