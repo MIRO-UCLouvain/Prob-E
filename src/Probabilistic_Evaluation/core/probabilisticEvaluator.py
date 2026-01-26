@@ -15,14 +15,16 @@ class ProbabilisticEvaluator:
         self.calc_VWMin = calc_VWMin
         self.calc_VWMax = calc_VWMax
         self.calc_CummulPR = calc_CummulPR
+        self.prob_list = [p.probability for p in self.patientData.scenarios_list]
         self.VWMin = None
         self.VWMax = None
         if self.calc_VWMin:
             self.VWMin = self.patientData.doseImage
         if self.calc_VWMax:
-            self.VWMax = np.zeros_like(self.patientData.doseImage)
-        self.CummulPR = None
+            self.VWMax = np.zeros_like(self.patientData.doseImage)   
         self.PR = None
+        self.CummulPR = None
+        self.CummulPR_rel = None
 
 
     def evaluate(self):
@@ -46,26 +48,10 @@ class ProbabilisticEvaluator:
             if self.calc_VWMax:
                 self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
             scenario.delete_doseImage()
+        self.calculate_passingRates()
         if self.calc_CummulPR:
-            self.calculate_cummul_PR()
-
-
-
-    def passingRate_table(self):
-        """
-        Print a table with clinical goals, prescribed doses, and passing rates.
-        """
-        data = []
-        for goal_name, goal_obj in self.clinical_goals.items():
-            data.append({
-                'Clinical Goal': goal_name,
-                'Dose treshold': goal_obj.prescription,
-                'Passing Rate': goal_obj.passingRate
-            })
-        
-        df = pd.DataFrame(data)
-        print(df.to_string(index=False))
-    
+            self.calculate_cummulPR()
+            self.calculate_cummulPR_relative()
 
     def calculate_passingRates(self):
         PR = []
@@ -74,14 +60,12 @@ class ProbabilisticEvaluator:
             for i, s in enumerate(goal.scenariosValuesAchieved):
 
                 if s:
-                    p += self.scenarios[i].probability
+                    p += self.prob_list[i]
             PR.append(p)
         self.PR = PR
 
-    def calculate_cummul_PR(self):
-        """
-        Need some form of prioritization of clinical goals to calculate a cummulative passing rate
-        """
+    def calculate_cummulPR(self):
+      
         cummul_PR = []
         i=1
         cummul_PR_prev = self.PR[0]
@@ -89,18 +73,26 @@ class ProbabilisticEvaluator:
         remaining_succesList = self.clinical_goals[0].succesList
         while i < len(self.clinical_goals):
             remaining_succesList = [x*y for x,y in (self.clinical_goals[i].succesList,remaining_succesList)]
-            cummul_PR_current = sum([self.scenarios[j].probability for j, x in enumerate(remaining_succesList) if x])
+            cummul_PR_current = sum(x*p for x,p in zip(remaining_succesList, self.prob_list))
 
-            #two options either absolute cummulative passing rate or relative cummulative passing rate
-            #1. absolute
             cummul_PR.append(cummul_PR_current)
-            #2. relative
-            #self.clinical_goals[goal_name].SetCummulative_passingRate(cummul_PR / cummul_PR_prev)
-            #cummul_PR = cummul_PR_current*cummul_PR_prev
+            
             cummul_PR_prev = cummul_PR_current
             i+=1
         self.CummulPR = cummul_PR
 
+    def calculate_cummulPR_relative(self):
+        cummul_PR_rel = []
+        i=1
+        cummulPR_prev= self.CummulPR[0]
+        cummul_PR_rel.append(cummulPR_prev)
+        while i < len(self.clinical_goals):
+            cummul_PR = self.CummulPR[i]
+            cummul_PR_relative = cummul_PR / cummulPR_prev
+            cummul_PR_rel.append(cummul_PR_relative)
+            cummulPR_prev = cummul_PR
+            i+=1
+        self.CummulPR_rel = cummul_PR_rel
 
 
     def write_to_csv(self, out_path:str):
@@ -115,6 +107,7 @@ class ProbabilisticEvaluator:
             })
             if self.calc_CummulPR:
                 data[-1]['Cummulative Passing Rate'] = self.CummulPR[i]
+                data[-1]['Cummulative Passing Rate (Relative)'] = self.CummulPR_rel[i]
         
         df = pd.DataFrame(data)
         df.to_csv(out_path, index=False)
