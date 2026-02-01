@@ -18,16 +18,20 @@ class clinicalgoalsreader():
         A dictionary to store clinical in dictionary format loaded from the JSON file.
     clinical_goals_list : list
         A list to store all AbstractClinicalGoal objects created from the clinical_goals_dict.
+
+    Methods
+    -------
+    load_JSON_list(clinicalgoalpath: str)
+        Load a JSON list of clinical goals and populate the internal list.
+    load_clinical_goals() -> list
+        Create clinical goal objects from the JSON list.
+    ClinicalGoalFromDict(goal_dict: dict) -> AbstractClinicalGoal
+        Build a clinical goal object from a dictionary.
+    load_json_list() -> list
+        Read the clinical goals JSON file.
     """
 
     def __init__(self, maskDict: dict=None):
-        """Initialize the reader.
-
-        Parameters
-        ----------
-        maskDict : dict, optional
-            Dictionary mapping ROI names to mask arrays.
-        """
         self._maskDict = maskDict
         self._path = None
         self.clinical_goals_dict: dict = None
@@ -66,25 +70,11 @@ class clinicalgoalsreader():
     
 
     def load_JSON_list(self, clinicalgoalpath: str, ):
-        """Load a JSON list of clinical goals and populate the internal list.
-
-        Parameters
-        ----------
-        clinicalgoalpath : str
-            Path to the clinical goals JSON file.
-        """
         self.path = clinicalgoalpath
         self._clinical_goals_list = self.load_clinical_goals()
         
 
     def load_clinical_goals(self):
-        """Create clinical goal objects from the JSON list.
-
-        Returns
-        -------
-        list
-            List of clinical goal objects.
-        """
         goals_dict_list = self.load_json_list()
         goals_list = []
         for goal in goals_dict_list:
@@ -93,18 +83,6 @@ class clinicalgoalsreader():
         return goals_list
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
-        """Build a clinical goal object from a dictionary.
-
-        Parameters
-        ----------
-        goal_dict : dict
-            Dictionary describing a clinical goal.
-
-        Returns
-        -------
-        AbstractClinicalGoal
-            Concrete clinical goal instance.
-        """
         #add sufficient checks here
         maskName=goal_dict["ROI"]
         mask = self.maskDict[maskName]
@@ -136,13 +114,6 @@ class clinicalgoalsreader():
         return goal
 
     def load_json_list(self):
-        """Read the clinical goals JSON file.
-
-        Returns
-        -------
-        list
-            List of clinical goal dictionaries.
-        """
         with open(self.path, "r") as f:
             goals = json.load(f)
         return goals
