@@ -7,7 +7,69 @@ import pandas as pd
 
 class ProbabilisticEvaluator:
 
+    """
+    A class to evaluate clinical goals across probabilistic scenarios.
+
+    Attributes
+    ----------
+    patientData : PatientData
+        patientData object containing dose, masks, and clinical goals.
+    sampler : AbstractsamplingMethod
+        Sampling method used to generate scenarios.
+    scenarios : list
+        List of generated scenarios for evaluation.
+    clinical_goals : list
+        List of clinical goals associated with the patient.
+    calc_VWMin : bool
+        Whether to compute voxel-wise minimum dose across scenarios.
+    calc_VWMax : bool
+        Whether to compute voxel-wise maximum dose across scenarios.
+    calc_CummulPR : bool
+        Whether to compute cumulative passing rates.
+    prob_list : list
+        Scenario probabilities in the same order as scenarios.
+    VWMin : np.ndarray or None
+        Voxel-wise minimum dose image if enabled.
+    VWMax : np.ndarray or None
+        Voxel-wise maximum dose image if enabled.
+    PR : list or None
+        Passing rates for each clinical goal.
+    CummulPR : list or None
+        Cumulative passing rates for each clinical goal.
+    CummulPR_rel : list or None
+        Relative cumulative passing rates for each clinical goal.
+
+    Methods
+    -------
+    evaluate()
+        Evaluate all scenarios and compute clinical goal values and passing rates.
+    calculate_passingRates()
+        Compute passing rates for each clinical goal.
+    calculate_cummulPR()
+        Compute cumulative passing rates.
+    calculate_cummulPR_relative()
+        Compute relative cumulative passing rates.
+    write_to_csv(out_path: str)
+        Write evaluation results to a CSV file.
+    """
+
     def __init__(self, PatientData:PatientData, sampler:AbstractsamplingMethod, calc_VWMin:bool=False, calc_VWMax:bool=False, calc_CummulPR:bool=False):
+        """
+        Initialize a probabilistic evaluator.
+
+        Parameters
+        ----------
+        PatientData : PatientData
+            Patient data object containing dose, masks, and clinical goals.
+        sampler : AbstractsamplingMethod
+            Sampling method used to generate scenarios.
+        calc_VWMin : bool, optional
+            Whether to compute voxel-wise minimum dose across scenarios.
+        calc_VWMax : bool, optional
+            Whether to compute voxel-wise maximum dose across scenarios.
+        calc_CummulPR : bool, optional
+            Whether to compute cumulative passing rates.
+        """
         self.patientData = PatientData
         self.sampler = sampler
         self.scenarios = None
@@ -28,6 +90,9 @@ class ProbabilisticEvaluator:
 
 
     def evaluate(self):
+        """
+        Evaluate scenarios and compute clinical goal values and passing rates.
+        """
         self.scenarios = ScenariosGenerator(sampling_method=self.sampler).scenarios_list
 
         for scenario in self.scenarios:
@@ -54,6 +119,9 @@ class ProbabilisticEvaluator:
             self.calculate_cummulPR_relative()
 
     def calculate_passingRates(self):
+        """
+        Compute passing rates for each clinical goal.
+        """
         PR = []
         for goal in self.clinical_goals.values():
             p = 0.0
@@ -65,6 +133,9 @@ class ProbabilisticEvaluator:
         self.PR = PR
 
     def calculate_cummulPR(self):
+        """
+        Compute cumulative passing rates for ordered clinical goals.
+        """
       
         cummul_PR = []
         i=1
@@ -82,6 +153,9 @@ class ProbabilisticEvaluator:
         self.CummulPR = cummul_PR
 
     def calculate_cummulPR_relative(self):
+        """
+        Compute relative cumulative passing rates.
+        """
         cummul_PR_rel = []
         i=1
         cummulPR_prev= self.CummulPR[0]
@@ -98,6 +172,11 @@ class ProbabilisticEvaluator:
     def write_to_csv(self, out_path:str):
         """
         Write evaluation results to a CSV file.
+
+        Parameters
+        ----------
+        out_path : str
+            Output path for the CSV file.
         """
         data = []
         for i, goal in enumerate(self.clinical_goals):
