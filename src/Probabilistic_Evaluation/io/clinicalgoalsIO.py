@@ -77,21 +77,21 @@ class clinicalgoalsreader():
         prescription=goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority", 0)
-        if goal_dict["type"] == "Dmax":
+        if goal_dict["type"] == "DMax":
             goal = DMaxClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] == "Dmin":
+        elif goal_dict["type"] == "DMin":
             goal = DMinClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] == "Dmean":
+        elif goal_dict["type"] == "DMean":
             goal = DMeanClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
         elif goal_dict["type"] == "Dxcc":
             volume = goal_dict["absolute_volume"]
             goal = DCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better,  volume=volume)
         elif goal_dict["type"] == "Vxcc":
             volume = goal_dict["absolute_volume"]
-            goal = VCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, volume=volume)
+            goal = VCCClinicalGoal(prescription=volume, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, dose=prescription)
         elif goal_dict["type"] == "Vx":
             volume = goal_dict["volume"]/100.0
-            goal = VXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, volume=volume)
+            goal = VXClinicalGoal(prescription=volume, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, dose=prescription)
         elif goal_dict["type"] == "Dx":
             volume = goal_dict["volume"]/100.0
             goal = DXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, volume=volume)

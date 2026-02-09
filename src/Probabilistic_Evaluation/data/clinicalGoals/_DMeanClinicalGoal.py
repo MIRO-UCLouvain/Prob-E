@@ -49,5 +49,5 @@ class DMeanClinicalGoal(AbstractClinicalGoal):
         float
             The computed mean dose value.
         """
-        value = dvh.Dmean()
+        value = dvh.DMean()
         return value

@@ -26,12 +26,13 @@ class VoronoiSampling(AbstractsamplingMethod):
         Retrieve the precomputed Voronoi points and their probabilities.
     """
 
-    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, max_displacements: np.ndarray, spacing: np.ndarray):
+    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, max_displacements: np.ndarray, spacing: np.ndarray,reducedSetCumulProba:float=None):
         super().__init__(uncertaintyModel)
         if max_displacements.shape != spacing.shape:
             raise ValueError("max_displacements and spacing must have the same shape.")
         self._voronoiPoints = None
         self._voronoiProbabilities = None
+        self.reducedSetCumulProba = reducedSetCumulProba
         self._generateVoronoiSampling(max_displacements, spacing, computing_method='analytical')
 
     @property
@@ -167,6 +168,9 @@ class VoronoiSampling(AbstractsamplingMethod):
         """
         voronoiPoints = self._generateVoronoiPoints(bounds, spacing)
         probabilities = self._generateVoronoiProbabilities(voronoiPoints, computing_method, spacing)
+
+        if self.reducedSetCumulProba is not None:
+            voronoiPoints,probabilities = self.reduceNumberOfScenarios(voronoiPoints,probabilities)
         self._voronoiPoints = voronoiPoints
         self._voronoiProbabilities = probabilities
 
@@ -205,10 +209,11 @@ class VoronoiSampling(AbstractsamplingMethod):
         voronoiProbabilities : np.ndarray
             The probabilities associated with each Voronoi point.
         """
+
         return self._voronoiPoints, self._voronoiProbabilities
     
 
-    def reduceNumberOfScenarios(self, cumulative_probability: float=0.99):
+    def reduceNumberOfScenarios(self,voronoiPoints:np.ndarray, voronoiProbabilities:np.ndarray):
         """
         Reduce the number of Voronoi scenarios based on a specified cumulative probability threshold.
 
@@ -224,18 +229,19 @@ class VoronoiSampling(AbstractsamplingMethod):
         reduced_probabilities : np.ndarray
             The probabilities associated with the reduced Voronoi points.
         """
+        cumulative_probability = self.reducedSetCumulProba
         if not (0 < cumulative_probability <= 1):
             raise ValueError("Cumulative probability must be between 0 and 1.")
 
-        sorted_indices = np.argsort(self._voronoiProbabilities)[::-1]
-        sorted_probabilities = self._voronoiProbabilities[sorted_indices]
+        sorted_indices = np.argsort(voronoiProbabilities)[::-1]
+        sorted_probabilities = voronoiProbabilities[sorted_indices]
         cumulative_probs = np.cumsum(sorted_probabilities)
 
         num_cells = np.searchsorted(cumulative_probs, cumulative_probability, side='right') + 1
 
         reduced_indices = sorted_indices[:num_cells]
-        reduced_points = self._voronoiPoints[reduced_indices]
-        reduced_probabilities = self._voronoiProbabilities[reduced_indices]
+        reduced_points = voronoiPoints[reduced_indices]
+        reduced_probabilities = voronoiProbabilities[reduced_indices]
 
         # Normalize the reduced probabilities to sum to 1
         reduced_probabilities /= np.sum(reduced_probabilities)

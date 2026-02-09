@@ -20,6 +20,7 @@ class Scenario(object):
         self._displacement: np.ndarray = displacement
         self._probability: float = probability
         self._doseImage = None
+        self.ID = None
 
     @property
     def doseImage(self) -> np.ndarray:
