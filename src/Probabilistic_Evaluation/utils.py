@@ -3,12 +3,14 @@ import numpy as np
 def shift_dose_image(doseImage, shift):
     """
     Shift the dose image by the specified amount in each dimension.
+
     Parameters
     ----------
     doseImage : np.ndarray
         The dose image to be shifted.
     shift : tuple
         A tuple specifying the shift in each dimension (z, y, x).
+
     Returns
     -------
     shifted_dose : np.ndarray

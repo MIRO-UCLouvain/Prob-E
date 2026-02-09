@@ -3,23 +3,23 @@ from scipy.spatial import cKDTree
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
 from Probabilistic_Evaluation.data.uncertaintyModel._abstractUncertaintyModel import AbstractUncertaintyModel
 
+
 class VoronoiSampling(AbstractsamplingMethod):
     """
-    A class to represent Voronoi sampling and compute their probabilities
-    based on Monte Carlo simulation and analytical methods (default is analytical).
+    A class to represent Voronoi sampling and compute their probabilities based on Monte Carlo simulation and analytical methods (default is analytical).
 
     Voronoi sampling precomputes achievable Voronoi points and their associated probabilities
     based on the provided uncertainty model, bounds, and spacing.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     voronoiPoints : np.ndarray
         The Voronoi points generated within the specified bounds and spacing.
     voronoiProbabilities : np.ndarray
         The probabilities associated with each Voronoi point.
 
-    Methods:
-    --------
+    Methods
+    -------
     MCsampling(N_samples: int):
         Perform Monte Carlo sampling based on the Voronoi points and their probabilities.
     analyticalSampling():
@@ -37,10 +37,12 @@ class VoronoiSampling(AbstractsamplingMethod):
 
     @property
     def voronoiPoints(self) -> np.ndarray:
+        """Voronoi points generated within the specified bounds and spacing."""
         return self._voronoiPoints
 
     @property
     def voronoiProbabilities(self) -> np.ndarray:
+        """Probabilities associated with each Voronoi point."""
         return self._voronoiProbabilities
 
     def _generateVoronoiPoints(self, max_displacements: np.ndarray, spacing: np.ndarray) -> np.ndarray:
@@ -59,7 +61,6 @@ class VoronoiSampling(AbstractsamplingMethod):
         voronoiPoints : np.ndarray
             The generated Voronoi points.
         """
-
         rounded_bounds = np.around(max_displacements / spacing)
         limit_range = [np.arange(-b, b + 1) for b in rounded_bounds]
         XX, YY, ZZ = np.meshgrid(limit_range[0], limit_range[1], limit_range[2])
@@ -138,6 +139,7 @@ class VoronoiSampling(AbstractsamplingMethod):
             The method to use for computing probabilities ('montecarlo' or 'analytical').
         spacing : np.ndarray
             The spacing between Voronoi points.
+
         Returns
         -------
         probabilities : np.ndarray
@@ -165,6 +167,7 @@ class VoronoiSampling(AbstractsamplingMethod):
 
         Returns
         -------
+        None.
         """
         voronoiPoints = self._generateVoronoiPoints(bounds, spacing)
         probabilities = self._generateVoronoiProbabilities(voronoiPoints, computing_method, spacing)
@@ -211,9 +214,8 @@ class VoronoiSampling(AbstractsamplingMethod):
         """
 
         return self._voronoiPoints, self._voronoiProbabilities
-    
 
-    def reduceNumberOfScenarios(self,voronoiPoints:np.ndarray, voronoiProbabilities:np.ndarray):
+    def reduceNumberOfScenarios(self, cumulative_probability: float = 0.99):
         """
         Reduce the number of Voronoi scenarios based on a specified cumulative probability threshold.
 
@@ -233,15 +235,15 @@ class VoronoiSampling(AbstractsamplingMethod):
         if not (0 < cumulative_probability <= 1):
             raise ValueError("Cumulative probability must be between 0 and 1.")
 
-        sorted_indices = np.argsort(voronoiProbabilities)[::-1]
-        sorted_probabilities = voronoiProbabilities[sorted_indices]
+        sorted_indices = np.argsort(self._voronoiProbabilities)[::-1]
+        sorted_probabilities = self._voronoiProbabilities[sorted_indices]
         cumulative_probs = np.cumsum(sorted_probabilities)
 
         num_cells = np.searchsorted(cumulative_probs, cumulative_probability, side='right') + 1
 
         reduced_indices = sorted_indices[:num_cells]
-        reduced_points = voronoiPoints[reduced_indices]
-        reduced_probabilities = voronoiProbabilities[reduced_indices]
+        reduced_points = self._voronoiPoints[reduced_indices]
+        reduced_probabilities = self._voronoiProbabilities[reduced_indices]
 
         # Normalize the reduced probabilities to sum to 1
         reduced_probabilities /= np.sum(reduced_probabilities)

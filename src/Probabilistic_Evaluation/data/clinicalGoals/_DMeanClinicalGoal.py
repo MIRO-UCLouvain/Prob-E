@@ -10,8 +10,6 @@ class DMeanClinicalGoal(AbstractClinicalGoal):
     ----------
     prescription : float
         The prescribed mean dose value for the clinical goal.
-    value : float
-        The evaluated value for the clinical goal.
     lower_is_better : bool
         Indicates if lower values are better for this goal.
     mask : np.ndarray
@@ -26,8 +24,8 @@ class DMeanClinicalGoal(AbstractClinicalGoal):
         A list to store success status for each scenario.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, priority: int, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, maskName, priority, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
+        super().__init__(prescription, mask, maskName, lower_is_better)
 
     def __str__(self):
         if self.lower_is_better:
@@ -39,6 +37,7 @@ class DMeanClinicalGoal(AbstractClinicalGoal):
     def compute_value(self, dvh) -> float:
         """
         Compute the mean dose from the DVH.
+
         Parameters
         ----------
         dvh : DVH

@@ -10,9 +10,7 @@ class VXClinicalGoal(AbstractClinicalGoal):
     ----------
     prescription : float
         The prescribed volume percentage (in %, e.g. 0.5 for 50%) for the clinical goal.
-    value : float
-        The evaluated value for the clinical goal.
-    lower_is_better : bool
+    lower_is_better : bool (default=True)
         Indicates if lower values are better for this goal.
     mask : np.ndarray
         The mask defining the region of interest for the clinical goal.
@@ -28,10 +26,10 @@ class VXClinicalGoal(AbstractClinicalGoal):
         The dose (in Gy) associated with the clinical goal.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, priority: int, lower_is_better: bool = True, **kwargs):
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
         if prescription > 1:
             raise ValueError("Prescription must be given in percentage (0-1).")
-        super().__init__(prescription, mask, maskName, priority, lower_is_better)
+        super().__init__(prescription, mask, maskName, lower_is_better)
         self._dose = kwargs.get('dose', None)  # Dose in Gy
         if self._dose is None:
             raise ValueError("Dose must be provided for VX ClinicalGoal.")
@@ -58,6 +56,7 @@ class VXClinicalGoal(AbstractClinicalGoal):
     def compute_value(self, dvh) -> float:
         """
         Compute the volume percentage corresponding to the specified dose from the DVH.
+
         Parameters
         ----------
         dvh : DVH

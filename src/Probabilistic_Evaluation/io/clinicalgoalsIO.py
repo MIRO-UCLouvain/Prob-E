@@ -18,7 +18,19 @@ class clinicalgoalsreader():
         A dictionary to store clinical in dictionary format loaded from the JSON file.
     clinical_goals_list : list
         A list to store all AbstractClinicalGoal objects created from the clinical_goals_dict.
+
+    Methods
+    -------
+    load_JSON_list(clinicalgoalpath: str)
+        Load a JSON list of clinical goals and populate the internal list.
+    load_clinical_goals() -> list
+        Create clinical goal objects from the JSON list.
+    ClinicalGoalFromDict(goal_dict: dict) -> AbstractClinicalGoal
+        Build a clinical goal object from a dictionary.
+    load_json_list() -> list
+        Read the clinical goals JSON file.
     """
+
     def __init__(self, maskDict: dict=None):
         self._maskDict = maskDict
         self._path = None
@@ -74,27 +86,29 @@ class clinicalgoalsreader():
         #add sufficient checks here
         maskName=goal_dict["ROI"]
         mask = self.maskDict[maskName]
-        prescription=goal_dict["dose"]
+        dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority", 0)
-        if goal_dict["type"] == "DMax":
-            goal = DMaxClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] == "DMin":
-            goal = DMinClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] == "DMean":
-            goal = DMeanClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
-        elif goal_dict["type"] == "Dxcc":
+        type = goal_dict["type"].upper()
+     
+        if type == "DMAX":         
+            goal = DMaxClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
+        elif type == "DMIN":       
+            goal = DMinClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
+        elif type == "DMEAN":       
+            goal = DMeanClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better)
+        elif type == "DXCC":         
             volume = goal_dict["absolute_volume"]
-            goal = DCCClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better,  volume=volume)
-        elif goal_dict["type"] == "Vxcc":
+            goal = DCCClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better,  volume=volume)
+        elif type == "VXCC": 
             volume = goal_dict["absolute_volume"]
-            goal = VCCClinicalGoal(prescription=volume, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, dose=prescription)
-        elif goal_dict["type"] == "Vx":
+            goal = VCCClinicalGoal(prescription=volume, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, dose=dose)
+        elif type == "VX":
             volume = goal_dict["volume"]/100.0
-            goal = VXClinicalGoal(prescription=volume, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, dose=prescription)
-        elif goal_dict["type"] == "Dx":
+            goal = VXClinicalGoal(prescription=volume, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, dose=dose)
+        elif type == "DX":
             volume = goal_dict["volume"]/100.0
-            goal = DXClinicalGoal(prescription=prescription, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, volume=volume)
+            goal = DXClinicalGoal(prescription=dose, mask=mask, maskName=maskName, lower_is_better=lower_is_better, priority=priority, volume=volume)
         else:
             raise ValueError(f"Unknown clinical goal type: {goal_dict['type']}")
         return goal
@@ -103,3 +117,4 @@ class clinicalgoalsreader():
         with open(self.path, "r") as f:
             goals = json.load(f)
         return goals
+    

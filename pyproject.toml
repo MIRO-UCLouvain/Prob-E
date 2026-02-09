@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "rt-probabilistic-evaluation"
 version = "0.1.0"
 description = "A package for probabilistic evaluation in radiation therapy"
+requires-python = ">=3.12"
 authors = [
   { name = "Matijs Geerts" },
   { name = "Romain Schyns" },
@@ -14,9 +15,14 @@ authors = [
 dependencies = [
     "numpy>=2.3.2,<3.0",
     "scipy>=1.11,<2.0",
+    "opentps>=3.0.0",
 ]
 
-requires-python = ">=3.12"
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4.0,<8.0",
+  "ruff>=0.0.297,<1.0"
+]
 
 
 [tool.setuptools]
@@ -24,10 +30,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.poetry.dev-dependencies]
-pytest = "^7.4.0"
-ruff = "^0.0.297"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

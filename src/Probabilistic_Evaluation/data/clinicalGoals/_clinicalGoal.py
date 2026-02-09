@@ -10,15 +10,13 @@ class AbstractClinicalGoal(ABC):
     ----------
     prescription : float
         The prescribed value for the clinical goal.
-    value : float
-        The evaluated value for the clinical goal.
-    lower_is_better : bool
+    lower_is_better : bool (default=True)
         Indicates if lower values are better for this goal.
     mask : np.ndarray
         The mask defining the region of interest for the clinical goal.
     maskName : str
         The name of the mask defining the region of interest for the clinical goal.
-    priority : int
+    priority : int (default=0)
         The priority level of the clinical goal, zero if no cummulative evaluation is desired.
     valueList : list
         A list to store list of values computed for the clinical goal on each scenario.
@@ -35,14 +33,14 @@ class AbstractClinicalGoal(ABC):
         Method to compute the clinical goal value and success status based on the provided DVH.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, priority: int, lower_is_better: bool = True,**kwargs):
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True,**kwargs):
         if prescription < 0:
             raise ValueError("Clinical goal prescription cannot be negative.")
         self._prescription: float = prescription
         self._lower_is_better: bool = lower_is_better
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
-        self._priority: int = priority
+        self._priority: int = kwargs.get('priority', 0)
         self.valueList: list = []
         self.successList: list = []
 
@@ -105,6 +103,7 @@ class AbstractClinicalGoal(ABC):
     def compute_value(self, dvh) -> float:
         """
         Compute the value of the clinical goal based on the provided DVH.
+
         Parameters
         ----------
         dvh

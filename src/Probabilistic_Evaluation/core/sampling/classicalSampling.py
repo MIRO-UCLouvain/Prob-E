@@ -4,14 +4,12 @@ from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import Abstr
 from Probabilistic_Evaluation.data.uncertaintyModel._abstractUncertaintyModel import AbstractUncertaintyModel
 
 
-
 class ClassicalSampling(AbstractsamplingMethod):
     """
-    A class to represent classical sampling methods and compute their probabilities
-    based on Monte Carlo simulation and analytical methods.
+    A class to represent classical sampling methods and compute their probabilities based on Monte Carlo simulation and analytical methods.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     UncertaintyModel : AbstractsamplingMethod
         The uncertainty model used for sampling.
     """
@@ -43,8 +41,8 @@ class ClassicalSampling(AbstractsamplingMethod):
     def analyticalSampling(self, **kwargs):
         """
         Sample the uncertainty model using analytical sampling.
-        Creates a grid of points within the specified bounds and evaluates
-        the PDF at each point to obtain probabilities.
+
+        Creates a grid of points within the specified bounds and evaluates the PDF at each point to obtain probabilities.
 
         Parameters
         ----------
