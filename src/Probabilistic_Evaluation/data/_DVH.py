@@ -120,7 +120,7 @@ class DVH(object):
         """
         Compute Dose-Volume Histogram (DVH) for a given mask.
         """
-        n_bins = 4096
+        n_bins = 1024
         if isinstance(self.mask, np.ndarray):
             mask = self.mask.astype(bool)
             dose_mask = self.dosemap[mask]
