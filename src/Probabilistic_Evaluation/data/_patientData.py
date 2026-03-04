@@ -32,9 +32,9 @@ class PatientData:
         # check matrix dimensions matches
         if ctImage.shape != doseImage.shape:
             raise ValueError("CT image and dose image must have the same dimensions.")
-        # for structureName, mask in maskDict.items():
-        #     if mask.shape != ctImage.shape:
-        #         raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the CT image.")
+        for structureName, mask in maskDict.items():
+            if mask.shape != ctImage.shape:
+                raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the CT image.")
         self._ctImage = ctImage
         self._doseImage = doseImage
         self._maskDict = maskDict
@@ -68,9 +68,9 @@ class PatientData:
 
     @maskDict.setter
     def maskDict(self, newMaskDict: dict):
-        # for structureName, mask in newMaskDict.items():
-        #     if mask.shape != self._ctImage.shape:
-        #         raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the CT image.")
+        for structureName, mask in newMaskDict.items():
+            if mask.shape != self._ctImage.shape:
+                raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the CT image.")
         self._maskDict = newMaskDict
 
     @property

@@ -38,10 +38,10 @@ class DVH(object):
     """
 
     def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0, spacing: tuple = (1.0, 1.0, 1.0)):
-        # if dosemap.shape != mask.shape:
-        #     raise ValueError("Dosemap and mask must have the same shape.")
-        # if len(dosemap.shape) != len(spacing):
-        #     raise ValueError("Spacing must have the same number of dimensions as dosemap.")
+        if dosemap.shape != mask.shape:
+            raise ValueError("Dosemap and mask must have the same shape.")
+        if len(dosemap.shape) != len(spacing):
+            raise ValueError("Spacing must have the same number of dimensions as dosemap.")
         for dim in spacing:
             if dim <= 0:
                 raise ValueError("All spacing values must be positive.")
