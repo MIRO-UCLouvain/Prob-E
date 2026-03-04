@@ -29,6 +29,7 @@ jobs:
     - name: 🧪 Run pytest
       run: |
         pytest
+      continue-on-error: false
 
     - name: 🔍 format with ruff
       run: |
@@ -38,4 +39,3 @@ jobs:
       run: |
         ruff check . --fix
       continue-on-error: true
-        
