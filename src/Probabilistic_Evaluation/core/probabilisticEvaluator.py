@@ -114,24 +114,6 @@ class ProbabilisticEvaluator:
 
         for t in threads:
             t.join()
-
-            # print("Evaluating scenario with displacement:", scenario.displacement)
-            # scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
-            # print("Shifted dose image computed.")
-            # dvh_dict = {}
-            # for mask in self.patientData.maskDict.keys():
-            #     print(f"Computing DVH for mask: {mask}")
-            #     dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
-            #     print(f"DVH computed for mask: {mask}")
-            # for goal in self.clinical_goals:
-            #     print(f"Computing value for clinical goal: {goal.maskName}")
-            #     goal.compute_value(dvh_dict[goal.maskName])
-            #     print(f"Value computed for clinical goal: {goal.maskName}")
-            # if self.calc_VWMin:
-            #     self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
-            # if self.calc_VWMax:
-            #     self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
-            # scenario.delete_doseImage()
         
         self.calculate_passingRates()
         if self.calc_CummulPR:

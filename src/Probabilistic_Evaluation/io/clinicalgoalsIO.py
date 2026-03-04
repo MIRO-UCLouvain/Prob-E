@@ -38,6 +38,7 @@ class clinicalgoalsreader():
         self._path = None
         self.clinical_goals_dict: dict = None
         self._clinical_goals_list: list = None
+        self._resampledMasks = {}
 
     @property
     def maskDict(self) -> dict:
@@ -45,7 +46,15 @@ class clinicalgoalsreader():
     @maskDict.setter
     def maskDict(self, newMaskDict: dict):
         self._maskDict = newMaskDict
-    
+
+    @property
+    def resampledMasks(self) -> dict:
+        return self._resampledMasks
+
+    @resampledMasks.setter
+    def resampledMasks(self, newResampledMasks: dict):
+        self._resampledMasks = newResampledMasks
+
     @property
     def path(self) -> str:
         return self._path
@@ -87,6 +96,7 @@ class clinicalgoalsreader():
         #add sufficient checks here
         maskName=goal_dict["ROI"]
         mask = self.maskDict[maskName].getBinaryMask(origin=self._ct.origin, gridSize=self._ct.gridSize, spacing=self._ct.spacing).imageArray
+        self.resampledMasks[maskName] = mask
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority", 0)
