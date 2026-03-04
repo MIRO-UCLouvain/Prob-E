@@ -76,12 +76,12 @@ class ProbabilisticEvaluator:
         """
         self.patientData = PatientData
         self.sampler = sampler
-        self.scenarios = None
+        self.scenarios = ScenariosGenerator(sampling_method=self.sampler).scenarios_list
         self.clinical_goals = self.patientData.clinicalGoalsList
         self.calc_VWMin = calc_VWMin
         self.calc_VWMax = calc_VWMax
         self.calc_CummulPR = calc_CummulPR
-        self.prob_list = [p.probability for p in self.patientData.scenarios_list]
+        self.prob_list = [p.probability for p in self.scenarios]
         self.VWMin = None
         self.VWMax = None
         if self.calc_VWMin:
@@ -102,11 +102,10 @@ class ProbabilisticEvaluator:
         """
         Evaluate scenarios and compute clinical goal values and passing rates.
         """
-        self.scenarios = ScenariosGenerator(sampling_method=self.sampler).scenarios_list
 
         threads = []
         for i, scenario in enumerate(self.scenarios):
-            while threading.active_count() >= self.nThreads:
+            while threading.active_count() > self.nThreads:
                 time.sleep(0.1)
             print(f"Starting thread for scenario {i+1}/{len(self.scenarios)}")
             t = threading.Thread(target=self.compute_and_evaluate_scenario, args=(scenario,))
@@ -136,7 +135,7 @@ class ProbabilisticEvaluator:
         
         self.calculate_passingRates()
         if self.calc_CummulPR:
-            self.calculate_cummul_PR()
+            self.calculate_cummulPR()
 
     def compute_and_evaluate_scenario(self, scenario):
         #print("Evaluating scenario with displacement:", scenario.displacement)
@@ -151,10 +150,6 @@ class ProbabilisticEvaluator:
         if self.calc_VWMax:
             self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
         scenario.delete_doseImage()
-        self.calculate_passingRates()
-        if self.calc_CummulPR:
-            self.calculate_cummulPR()
-            self.calculate_cummulPR_relative()
 
     def passingRate_table(self):
         """
@@ -170,31 +165,6 @@ class ProbabilisticEvaluator:
         
         df = pd.DataFrame(data)
         print(df.to_string(index=False))
-    
-
-    def calculate_passingRates(self):
-        for scenario in self.scenarios:
-            print("Evaluating scenario with displacement:", scenario.displacement)
-            scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
-            print("Shifted dose image computed.")
-            dvh_dict = {}
-            for mask in self.patientData.maskDict.keys():
-                print(f"Computing DVH for mask: {mask}")
-                dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
-                print(f"DVH computed for mask: {mask}")
-            for goal in self.clinical_goals:
-                print(f"Computing value for clinical goal: {goal.maskName}")
-                goal.compute_value(dvh_dict[goal.maskName])
-                print(f"Value computed for clinical goal: {goal.maskName}")
-            if self.calc_VWMin:
-                self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
-            if self.calc_VWMax:
-                self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
-            scenario.delete_doseImage()
-        self.calculate_passingRates()
-        if self.calc_CummulPR:
-            self.calculate_cummulPR()
-            self.calculate_cummulPR_relative()
 
     def calculate_passingRates(self):
         """
@@ -220,8 +190,8 @@ class ProbabilisticEvaluator:
         cummul_PR.append(cummul_PR_prev)
         remaining_successList = self.clinical_goals[0].successList
         while i < len(self.clinical_goals):
-            remaining_succesList = [x*y for x,y in (self.clinical_goals[i].succesList,remaining_succesList)]
-            cummul_PR_current = sum(x*p for x,p in zip(remaining_succesList, self.prob_list))
+            remaining_successList = [x*y for x,y in zip(self.clinical_goals[i].successList, remaining_successList)]
+            cummul_PR_current = sum(x*p for x,p in zip(remaining_successList, self.prob_list))
 
             cummul_PR.append(cummul_PR_current)
             
@@ -239,7 +209,10 @@ class ProbabilisticEvaluator:
         cummul_PR_rel.append(cummulPR_prev)
         while i < len(self.clinical_goals):
             cummul_PR = self.CummulPR[i]
-            cummul_PR_relative = cummul_PR / cummulPR_prev
+            if cummulPR_prev == 0:
+                cummul_PR_relative = 0.0
+            else:
+                cummul_PR_relative = cummul_PR / cummulPR_prev
             cummul_PR_rel.append(cummul_PR_relative)
             cummulPR_prev = cummul_PR
             i+=1
@@ -293,3 +266,116 @@ class ProbabilisticEvaluator:
         
         df = pd.DataFrame(data)
         df.to_csv(out_path, index=False)
+
+    def display_tables(self):
+        """
+       display in a interface the passing rates and cumulative passing rates in a table format, with clinical goals as rows and passing rates as columns.
+        """
+        self.calculate_passingRates()
+        self.calculate_cummulPR()
+        self.calculate_cummulPR_relative()
+        zero_disp = np.array([0, 0, 0])
+        zero_idx = None
+        for i, scenario in enumerate(self.scenarios):
+            try:
+                if np.allclose(np.asarray(scenario.displacement), zero_disp):
+                    zero_idx = i
+                    break
+            except Exception:
+                continue
+        data = []
+        for i, goal in enumerate(self.clinical_goals):
+            row = {
+                'Clinical Goal': goal.__str__(),
+                'Passing Rate': "{:.3f}".format(self.PR[i])
+            }
+            if zero_idx is not None and len(goal.valueList) > zero_idx:
+                row['Scenario [0,0,0]'] = "{:.3f}".format(goal.valueList[zero_idx])
+            else:
+                row['Scenario [0,0,0]'] = "N/A"
+            if self.calc_CummulPR:
+                row['Cummulative Passing Rate'] = "{:.3f}".format(self.CummulPR[i])
+                row['Cummulative Passing Rate (Relative)'] = "{:.3f}".format(self.CummulPR_rel[i])
+            data.append(row)
+        
+        df = pd.DataFrame(data)
+        ordered_cols = ['Clinical Goal', 'Scenario [0,0,0]']
+        ordered_cols += [c for c in df.columns if c not in ordered_cols]
+        df = df[ordered_cols]
+
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(max(8, len(df.columns) * 2.2), max(3, len(df) * 0.6)))
+        ax.axis('off')
+
+        import textwrap
+        from matplotlib import cm
+
+        def value_to_color(val: float, alpha: float = 0.6):
+            try:
+                v = float(val)
+            except (TypeError, ValueError):
+                return None
+            v = max(0.0, min(1.0, v))
+            color = list(cm.get_cmap('RdYlGn')(v))
+            color[3] = alpha
+            return tuple(color)
+
+        def text_color_for_bg(color) -> str:
+            if not color:
+                return 'black'
+            if isinstance(color, (list, tuple)) and len(color) >= 3:
+                r, g, b = color[0], color[1], color[2]
+            else:
+                return 'black'
+            luminance = 0.299 * r + 0.587 * g + 0.114 * b
+            return 'black' if luminance > 0.6 else 'white'
+
+        def wrap_label(label, max_len=14):
+            if len(label) <= max_len:
+                return label
+            parts = textwrap.wrap(label, width=max_len)
+            if len(parts) <= 2:
+                return "\n".join(parts)
+            return "\n".join([parts[0], " ".join(parts[1:])])
+
+        col_labels = [wrap_label(col) for col in df.columns]
+
+        table = ax.table(
+            cellText=df.values,
+            colLabels=col_labels,
+            loc='center',
+            cellLoc='center'
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1, 1.4)
+
+        # Color numeric cells based on thresholds
+        for (row_idx, col_idx), cell in table.get_celld().items():
+            if row_idx == 0:
+                cell.set_text_props(weight='bold', color='white')
+                cell.set_facecolor('#4C72B0')
+                continue
+
+            col_name = df.columns[col_idx]
+            if col_name in ['Passing Rate', 'Cummulative Passing Rate', 'Cummulative Passing Rate (Relative)']:
+                bg = value_to_color(df.iloc[row_idx - 1, col_idx])
+                if bg is None:
+                    continue
+                cell.set_facecolor(bg)
+                cell.set_text_props(color=text_color_for_bg(bg))
+            elif col_name == 'Scenario [0,0,0]':
+                if zero_idx is None:
+                    continue
+                try:
+                    success = self.clinical_goals[row_idx - 1].successList[zero_idx]
+                except Exception:
+                    continue
+                if success:
+                    cell.set_text_props(color='green')
+                else:
+                    cell.set_text_props(color='red')
+
+        plt.tight_layout()
+        plt.show()
+        

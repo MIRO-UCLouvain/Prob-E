@@ -3,6 +3,7 @@ import json
 
 from Probabilistic_Evaluation.data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
 from Probabilistic_Evaluation.data.clinicalGoals import * 
+from opentps.core.data.images import CTImage
 
 class clinicalgoalsreader():
     """
@@ -31,8 +32,9 @@ class clinicalgoalsreader():
         Read the clinical goals JSON file.
     """
 
-    def __init__(self, maskDict: dict=None):
+    def __init__(self, maskDict: dict=None,ct_image:CTImage=None):
         self._maskDict = maskDict
+        self._ct = ct_image
         self._path = None
         self.clinical_goals_dict: dict = None
         self._clinical_goals_list: list = None
@@ -65,8 +67,6 @@ class clinicalgoalsreader():
     def clinical_goals_list(self, newClinicalGoalsList: list):
         self._clinical_goals_list = newClinicalGoalsList
 
-
-
     
 
     def load_JSON_list(self, clinicalgoalpath: str, ):
@@ -80,12 +80,13 @@ class clinicalgoalsreader():
         for goal in goals_dict_list:
             clinical_goal_obj = self.ClinicalGoalFromDict(goal)
             goals_list.append(clinical_goal_obj)
+        goals_list.sort(key=lambda x: x.priority, reverse=True)
         return goals_list
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
         maskName=goal_dict["ROI"]
-        mask = self.maskDict[maskName]
+        mask = self.maskDict[maskName].getBinaryMask(origin=self._ct.origin, gridSize=self._ct.gridSize, spacing=self._ct.spacing).imageArray
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority", 0)

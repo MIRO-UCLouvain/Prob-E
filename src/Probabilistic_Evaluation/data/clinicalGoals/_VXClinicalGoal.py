@@ -51,7 +51,7 @@ class VXClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"{self.maskName}:V{self.dose}{comparison}{self.prescription:.1f}%"
+        return f"{self.maskName}:V{self.dose}{comparison}{self.prescription*100:.2f}%"
 
     def compute_value(self, dvh) -> float:
         """
@@ -68,4 +68,4 @@ class VXClinicalGoal(AbstractClinicalGoal):
             The computed volume percentage corresponding to the specified dose.
         """
         value = dvh.computeVx(self.dose)
-        return value
+        return value/100.0  # percentage

@@ -21,6 +21,7 @@ class DicomReader():
         self.RTDOSE: np.ndarray = None
         self.spacing: tuple = None
         self.data = None
+        self.CTImage = None
 
     def load_dicom_series(self,directory):
         """
@@ -61,12 +62,14 @@ class DicomReader():
     
     def readRTDOSE(self):
         # Only return the first DoseImage found
+        RTdoseList = []
         for key in self.data:
             if isinstance(key, DoseImage):
                 key.resample(self.spacing,self.CTImage.gridSize,self.CTImage.origin)
                 RTdose = key.imageArray
                 print(f"RTDOSE Image shape: {RTdose.shape} and spacing: {key.spacing}")
-                return RTdose
+                RTdoseList.append(RTdose)
+        return RTdoseList
         raise ValueError("No DoseImage found in the provided DICOM series.")
     
     def readRTSTRUCT(self):
@@ -77,7 +80,7 @@ class DicomReader():
                 print(f"RTSTRUCT loaded with {len(RTstruct.name)} structures.")
                 for contour in RTstruct._contours:
                     print(f"Structure: {contour.name}")
-                    RTstruct_dictionary[contour.name] = contour.getBinaryMask(origin=self.CTImage.origin, gridSize=self.CTImage.gridSize, spacing=self.spacing).imageArray
+                    RTstruct_dictionary[contour.name] = contour#.getBinaryMask(origin=self.CTImage.origin, gridSize=self.CTImage.gridSize, spacing=self.spacing).imageArray
                     
                 return RTstruct_dictionary
         raise ValueError("No RTStruct found in the provided DICOM series.")

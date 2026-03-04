@@ -169,13 +169,11 @@ class VoronoiSampling(AbstractsamplingMethod):
         -------
         None.
         """
-        voronoiPoints = self._generateVoronoiPoints(bounds, spacing)
-        probabilities = self._generateVoronoiProbabilities(voronoiPoints, computing_method, spacing)
+        self._voronoiPoints = self._generateVoronoiPoints(bounds, spacing)
+        self._voronoiProbabilities = self._generateVoronoiProbabilities(self._voronoiPoints, computing_method, spacing)
 
         if self.reducedSetCumulProba is not None:
-            voronoiPoints,probabilities = self.reduceNumberOfScenarios(voronoiPoints,probabilities)
-        self._voronoiPoints = voronoiPoints
-        self._voronoiProbabilities = probabilities
+            self._voronoiPoints, self._voronoiProbabilities = self.reduceNumberOfScenarios(cumulative_probability=self.reducedSetCumulProba)
 
     def MCsampling(self, **kwargs):
         """

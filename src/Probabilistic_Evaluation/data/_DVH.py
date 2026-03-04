@@ -38,10 +38,10 @@ class DVH(object):
     """
 
     def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0, spacing: tuple = (1.0, 1.0, 1.0)):
-        if dosemap.shape != mask.shape:
-            raise ValueError("Dosemap and mask must have the same shape.")
-        if len(dosemap.shape) != len(spacing):
-            raise ValueError("Spacing must have the same number of dimensions as dosemap.")
+        # if dosemap.shape != mask.shape:
+        #     raise ValueError("Dosemap and mask must have the same shape.")
+        # if len(dosemap.shape) != len(spacing):
+        #     raise ValueError("Spacing must have the same number of dimensions as dosemap.")
         for dim in spacing:
             if dim <= 0:
                 raise ValueError("All spacing values must be positive.")
@@ -121,26 +121,27 @@ class DVH(object):
         Compute Dose-Volume Histogram (DVH) for a given mask.
         """
         n_bins = 4096
-        mask = self.mask.astype(bool)
-        dose_mask = self.dosemap[mask]
-        bin_size = self.maxDVH / n_bins
-        bin_edges = np.arange(0, self.maxDVH + 0.5 * bin_size, bin_size)  # np.arange is exclusive right limit
-        bin_edges[-1] += dose_mask.max()  # Ensure the max dose is included in the last bin
-        hist, _ = np.histogram(dose_mask, bins=bin_edges)
-        hist = np.flip(hist, 0)  # Flip to get descending order
-        dvh = np.cumsum(hist)  # Cumulative sum
-        dvh = np.flip(dvh, 0)  # Flip back to ascending order
-        dvh = dvh / np.sum(hist) * 100.0  # Normalize to percentage
-        self._bin_dose = (bin_edges[:-1] + bin_edges[1:]) / 2.0  # dose at midpoints of bins
-        self._dvh = dvh
+        if isinstance(self.mask, np.ndarray):
+            mask = self.mask.astype(bool)
+            dose_mask = self.dosemap[mask]
+            bin_size = self.maxDVH / n_bins
+            bin_edges = np.arange(0, self.maxDVH + 0.5 * bin_size, bin_size)  # np.arange is exclusive right limit
+            bin_edges[-1] += dose_mask.max()  # Ensure the max dose is included in the last bin
+            hist, _ = np.histogram(dose_mask, bins=bin_edges)
+            hist = np.flip(hist, 0)  # Flip to get descending order
+            dvh = np.cumsum(hist)  # Cumulative sum
+            dvh = np.flip(dvh, 0)  # Flip back to ascending order
+            dvh = dvh / np.sum(hist) * 100.0  # Normalize to percentage
+            self._bin_dose = (bin_edges[:-1] + bin_edges[1:]) / 2.0  # dose at midpoints of bins
+            self._dvh = dvh
 
-        # Compute DMin, DMax, DMean before deleting dosemap to free memory
-        DMax = self.DMax
-        DMin = self.DMin
-        DMean = self.DMean
+            # Compute DMin, DMax, DMean before deleting dosemap to free memory
+            DMax = self.DMax
+            DMin = self.DMin
+            DMean = self.DMean
 
-        del self._dosemap
-        self._dosemap = None  # free memory
+            del self._dosemap
+            self._dosemap = None  # free memory
 
     def computeDx(self, x: float) -> float:
         """
