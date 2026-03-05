@@ -24,8 +24,8 @@ class DMeanClinicalGoal(AbstractClinicalGoal):
         A list to store success status for each scenario.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, maskName, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, priority: int = 0, **kwargs):
+        super().__init__(prescription, mask, maskName, lower_is_better, priority)
 
     def __str__(self):
         if self.lower_is_better:

@@ -26,8 +26,8 @@ class DCCClinicalGoal(AbstractClinicalGoal):
         The volume (in cc) associated with the clinical goal.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, maskName, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, priority: int = 0, **kwargs):
+        super().__init__(prescription, mask, maskName, lower_is_better, priority)
         self._volume = kwargs.get('volume', None)  # Volume in cc
         if self._volume is None:
             raise ValueError("Volume must be provided for DCC ClinicalGoal.")

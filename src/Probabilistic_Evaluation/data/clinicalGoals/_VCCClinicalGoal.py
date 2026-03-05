@@ -26,8 +26,8 @@ class VCCClinicalGoal(AbstractClinicalGoal):
         The dose (in Gy) associated with the clinical goal.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
-        super().__init__(prescription, mask, maskName, lower_is_better)
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, priority: int = 0, **kwargs):
+        super().__init__(prescription, mask, maskName, lower_is_better, priority)
         self._dose = kwargs.get('dose', None)  # Dose in Gy
         if self._dose is None:
             raise ValueError("Dose must be provided for VCC ClinicalGoal.")
