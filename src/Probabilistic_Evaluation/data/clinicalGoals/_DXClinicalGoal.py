@@ -32,7 +32,7 @@ class DXClinicalGoal(AbstractClinicalGoal):
         self._volume = kwargs.get('volume', None)  # Volume in cc
         if self._volume is None:
             raise ValueError("Volume must be provided for DX ClinicalGoal.")
-        if self._volume <= 0:
+        if self._volume < 0:
             raise ValueError("Volume must be a positive value.")
         if self._volume > 1:
             raise ValueError("Volume must be given in percentage (0-1).")

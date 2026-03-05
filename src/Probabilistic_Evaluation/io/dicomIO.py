@@ -2,6 +2,7 @@ from opentps.core.io.dicomIO import *
 from opentps.core.io.dataLoader import *
 from opentps.core.data.images import DoseImage, CTImage
 from opentps.core.data import RTStruct
+import numpy as np
 
 class DicomReader():
     """
@@ -9,10 +10,18 @@ class DicomReader():
 
     Attributes
     ----------
-        CT (ndarray): The CT image data.
-        RTSTRUCT (dict): The RT structure data.
-        RTDOSE (ndarray): The RT dose image data.
-        spacing (tuple): The spacing of the CT image.
+    CT : np.ndarray
+        The CT image data as a 3D numpy array.
+    RTSTRUCT : dict
+        A dictionary containing the RTSTRUCT data, with structure names as keys and contour data as values
+    RTDOSE : np.ndarray
+        The RTDOSE image data as a 3D numpy array.
+    spacing : tuple
+        The voxel spacing for the CT image, typically in the format (x_spacing, y_spacing, z_spacing).
+    data : list
+        A list to store the raw DICOM data loaded from the specified directory.
+    CTImage : CTImage
+        An instance of the CTImage class from opentps.core.data.images, representing the CT image and its associated metadata.
     """
 
     def __init__(self):
@@ -27,12 +36,14 @@ class DicomReader():
         """
         Load a DICOM series from the specified directory.
 
-        Args:
-            directory (str): Path to the directory containing DICOM files.
+        Parameters
+        ----------
+        directory : str
+            The path to the directory containing the DICOM files.
 
         Returns
         -------
-            list: List of pydicom Dataset objects sorted by InstanceNumber.
+            None
         """
         self.data = readData(directory)
         print(f"Loaded {len(self.data)} DICOM files from {directory}")
@@ -40,13 +51,6 @@ class DicomReader():
 
         self.RTDOSE = self.readRTDOSE()
         self.RTSTRUCT = self.readRTSTRUCT()
-
-        # CTImage = readDicomCT(directory)
-        # self.CT = CTImage.imageArray
-        # self.spacing = CTImage.spacing()
-
-        # RTdoseImage = readDicomRTDose(directory)
-        # self.RTDOSE = RTdoseImage.imageArray
 
     def readCT(self):
         for key in self.data:
@@ -78,12 +82,11 @@ class DicomReader():
                 print(f"RTSTRUCT loaded with {len(RTstruct.name)} structures.")
                 for contour in RTstruct._contours:
                     print(f"Structure: {contour.name}")
-                    RTstruct_dictionary[contour.name] = contour#.getBinaryMask(origin=self.CTImage.origin, gridSize=self.CTImage.gridSize, spacing=self.spacing).imageArray
+                    RTstruct_dictionary[contour.name] = contour
                     
                 return RTstruct_dictionary
         raise ValueError("No RTStruct found in the provided DICOM series.")
 
-if __name__ == "__main__":
-    dicomDir = r"your path"
-    reader = DicomReader()
-    reader.load_dicom_series(dicomDir)
+
+
+
