@@ -72,13 +72,13 @@ class clinicalgoalsreader():
     @property
     def clinical_goals_list(self) -> list:
         return self._clinical_goals_list
+    
     @clinical_goals_list.setter
     def clinical_goals_list(self, newClinicalGoalsList: list):
         self._clinical_goals_list = newClinicalGoalsList
 
-    
 
-    def load_JSON_list(self, clinicalgoalpath: str, ):
+    def load_JSON_list(self, clinicalgoalpath: str):
         self.path = clinicalgoalpath
         self._clinical_goals_list = self.load_clinical_goals()
         
