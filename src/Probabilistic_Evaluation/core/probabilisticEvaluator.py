@@ -2,6 +2,7 @@ from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import Abstr
 from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
 from Probabilistic_Evaluation.data import DVH
+import os
 
 import threading
 import multiprocessing
@@ -201,53 +202,67 @@ class ProbabilisticEvaluator:
         self.CummulPR_rel = cummul_PR_rel
 
 
-    def write_to_csv(self, out_path:str):
+    def write_to_csv(self, dir_path:str,proba:float=None):
         """
         Write evaluation results to a CSV file.
 
         Parameters
         ----------
-        out_path : str
-            Output path for the CSV file.
+        dir_path : str
+            Directory path for the CSV file.
+        proba : float, optional
+            Probability value for the CSV file name.
         """
+        self.calculate_passingRates()
+        self.calculate_cummulPR()
+        self.calculate_cummulPR_relative()
         data = []
+        zero_disp = np.array([0, 0, 0])
+        zero_idx = None
+        for i, scenario in enumerate(self.scenarios):
+            try:
+                if np.allclose(np.asarray(scenario.displacement), zero_disp):
+                    zero_idx = i
+                    break
+            except Exception:
+                continue
         for i, goal in enumerate(self.clinical_goals):
             print(goal)
             print(self.PR[i])
             data.append({
                 'Clinical Goal': goal.__str__(),
+                'Nominal Scenario': "{:.3f}".format(goal.valueList[zero_idx]),
                 'Passing Rate': "{:.3f}".format(self.PR[i]),
+                'Cumulative Passing Rate': "{:.3f}".format(self.CummulPR[i]),
+                'Cumulative Passing Rate (Relative)': "{:.3f}".format(self.CummulPR_rel[i])
             })
-            if self.calc_CummulPR:
-                data[-1]['Cumulative Passing Rate'] = "{:.3f}".format(self.CummulPR[i])
-                data[-1]['Cumulative Passing Rate (Relative)'] = "{:.3f}".format(self.CummulPR_rel[i])
+        #for each objective; store the success list
+        for i, goal in enumerate(self.clinical_goals):
+            for j, success in enumerate(goal.successList):
+                data[i][f'Scenario {j+1} Success'] = success
 
-        import matplotlib.pyplot as plt
-        z_idx = 110
-        plt.imshow(self.patientData.ctImage[:,:,z_idx], cmap='gray')
-        plt.contour(self.patientData.maskDict['PTVp_High'][:,:,z_idx], levels=[0.5], colors='red', linewidths=0.5)
-        plt.imshow(self.VWMin[:,:,z_idx], cmap='jet',alpha=0.5)
-        plt.colorbar(label='Dose')
-        plt.title('VWMin Dose Distribution (Slice 99)')
-        plt.show()
-
-        plt.imshow(self.patientData.ctImage[:,:,z_idx], cmap='gray')
-        plt.contour(self.patientData.maskDict['PTVp_High'][:,:,z_idx], levels=[0.5], colors='red', linewidths=0.5)
-        plt.imshow(self.VWMax[:,:,z_idx], cmap='jet',alpha=0.5)
-        plt.colorbar(label='Dose')
-        plt.title('VWMax Dose Distribution (Slice 99)')
-        plt.show()
-
-        #diff between VWMax and VWMin
-        plt.imshow(self.patientData.ctImage[:,:,z_idx], cmap='gray')
-        plt.contour(self.patientData.maskDict['PTVp_High'][:,:,z_idx], levels=[0.5], colors='red', linewidths=0.5)
-        plt.imshow(self.VWMax[:,:,z_idx]-self.VWMin[:,:,z_idx], cmap='jet',alpha=0.5)
-        plt.colorbar(label='Dose Difference')
-        plt.title('VWMax - VWMin Dose Distribution (Slice 99)')
-        plt.show()
-        
         df = pd.DataFrame(data)
+        # check if outpath exist and add number at the end if it does
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        else:
+            i = 1
+            while os.path.exists(f"{dir_path[:]}_{i}"):
+                i += 1
+            dir_path = f"{dir_path[:]}_{i}"
+            os.makedirs(dir_path)
+
+        out_path = os.path.join(dir_path, 'evaluation_results.csv')
+
+        if proba is not None:
+            out_path = out_path.replace('.csv', f'_{proba*100:.0f}proba.csv')
+            if self.calc_VWMax:
+                np.save(os.path.join(dir_path, f'VWMax{proba*100:.0f}.npy'), self.VWMax)
+            if self.calc_VWMin:
+                np.save(os.path.join(dir_path, f'VWMin{proba*100:.0f}.npy'), self.VWMin)
+
         df.to_csv(out_path, index=False)
+
 
     def display_tables(self):
         """
@@ -360,4 +375,32 @@ class ProbabilisticEvaluator:
 
         plt.tight_layout()
         plt.show()
-        
+
+    def displayVminVmax(self):
+        """
+        Display voxel-wise minimum and maximum dose images.
+        """
+        import matplotlib.pyplot as plt
+        z_idx = 110
+        if self.calc_VWMin and self.calc_VWMax:
+            plt.imshow(self.patientData.ctImage[:,:,z_idx], cmap='gray')
+            plt.contour(self.patientData.maskDict['CTVp_High'][:,:,z_idx], levels=[0.5], colors='red', linewidths=0.5)
+            plt.imshow(self.VWMin[:,:,z_idx], cmap='jet',alpha=0.5)
+            plt.colorbar(label='Dose')
+            plt.title('VWMin Dose Distribution (Slice {0})'.format(z_idx))
+            plt.show()
+
+            plt.imshow(self.patientData.ctImage[:,:,z_idx], cmap='gray')
+            plt.contour(self.patientData.maskDict['CTVp_High'][:,:,z_idx], levels=[0.5], colors='red', linewidths=0.5)
+            plt.imshow(self.VWMax[:,:,z_idx], cmap='jet',alpha=0.5)
+            plt.colorbar(label='Dose')
+            plt.title('VWMax Dose Distribution (Slice {0})'.format(z_idx))
+            plt.show()
+
+            #diff between VWMax and VWMin
+            plt.imshow(self.patientData.ctImage[:,:,z_idx], cmap='gray')
+            plt.contour(self.patientData.maskDict['CTVp_High'][:,:,z_idx], levels=[0.5], colors='red', linewidths=0.5)
+            plt.imshow(self.VWMax[:,:,z_idx]-self.VWMin[:,:,z_idx], cmap='jet',alpha=0.5)
+            plt.colorbar(label='Dose Difference')
+            plt.title('VWMax - VWMin Dose Distribution (Slice {0})'.format(z_idx))
+            plt.show()
