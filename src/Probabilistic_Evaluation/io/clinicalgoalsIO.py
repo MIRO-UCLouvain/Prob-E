@@ -90,10 +90,8 @@ class clinicalgoalsreader():
             clinical_goal_obj = self.ClinicalGoalFromDict(goal)
             goals_list.append(clinical_goal_obj)
         if all(hasattr(goal, "priority") for goal in goals_list):
-            goals_list.sort(key=lambda x: x.priority, reverse=True)
-            print("Clinical goals sorted by priority.")
-            print("first goal: ", goals_list[0])
-            print("first goal priority: ", goals_list[0].priority)
+            goals_list.sort(key=lambda x: x.priority)
+           
         return goals_list
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
