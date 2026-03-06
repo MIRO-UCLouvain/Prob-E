@@ -33,17 +33,18 @@ class AbstractClinicalGoal(ABC):
         Method to compute the clinical goal value and success status based on the provided DVH.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True,**kwargs):
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, priority: int = 0, **kwargs):
         if prescription < 0:
             raise ValueError("Clinical goal prescription cannot be negative.")
         self._prescription: float = prescription
         self._lower_is_better: bool = lower_is_better
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
-        self._priority: int = kwargs.get('priority', 0)
+     
+        self._priority: int = priority
         self.valueList: list = []
         self.successList: list = []
-
+    
     @property
     def prescription(self) -> float:
         return self._prescription

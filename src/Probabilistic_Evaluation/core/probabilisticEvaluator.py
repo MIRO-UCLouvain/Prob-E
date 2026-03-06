@@ -1,9 +1,8 @@
-import os
-
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
 from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
 from Probabilistic_Evaluation.data import DVH
+import os
 
 import threading
 import multiprocessing
@@ -148,7 +147,7 @@ class ProbabilisticEvaluator:
         for goal_name, goal_obj in self.clinical_goals.items():
             data.append({
                 'Clinical Goal': goal_name,
-                'Dose treshold': goal_obj.prescription,
+                'Dose threshold': goal_obj.prescription,
                 'Passing Rate': goal_obj.passingRate
             })
         
@@ -246,8 +245,8 @@ class ProbabilisticEvaluator:
                 'Nominal Scenario': nominal_value,
                 'Nominal Scenario Passed': nominal_passed,
                 'Passing Rate': "{:.3f}".format(self.PR[i]),
-                'Cummulative Passing Rate': "{:.3f}".format(self.CummulPR[i]),
-                'Cummulative Passing Rate (Relative)': "{:.3f}".format(self.CummulPR_rel[i])
+                'Cumulative Passing Rate': "{:.3f}".format(self.CummulPR[i]),
+                'Cumulative Passing Rate (Relative)': "{:.3f}".format(self.CummulPR_rel[i])
             })
         #for each objective; store the success list
         for i, goal in enumerate(self.clinical_goals):
@@ -278,10 +277,10 @@ class ProbabilisticEvaluator:
 
         df.to_csv(out_path, index=False)
 
-        
+
     def display_tables(self):
         """
-       display in a interface the passing rates and cumulative passing rates in a table format, with clinical goals as rows and passing rates as columns.
+        display in a interface the passing rates and cumulative passing rates in a table format, with clinical goals as rows and passing rates as columns.
         """
         self.calculate_passingRates()
         self.calculate_cummulPR()
@@ -306,8 +305,8 @@ class ProbabilisticEvaluator:
             else:
                 row['Scenario [0,0,0]'] = "N/A"
             if self.calc_CummulPR:
-                row['Cummulative Passing Rate'] = "{:.3f}".format(self.CummulPR[i])
-                row['Cummulative Passing Rate (Relative)'] = "{:.3f}".format(self.CummulPR_rel[i])
+                row['Cumulative Passing Rate'] = "{:.3f}".format(self.CummulPR[i])
+                row['Cumulative Passing Rate (Relative)'] = "{:.3f}".format(self.CummulPR_rel[i])
             data.append(row)
         
         df = pd.DataFrame(data)
@@ -370,7 +369,7 @@ class ProbabilisticEvaluator:
                 continue
 
             col_name = df.columns[col_idx]
-            if col_name in ['Passing Rate', 'Cummulative Passing Rate', 'Cummulative Passing Rate (Relative)']:
+            if col_name in ['Passing Rate', 'Cumulative Passing Rate', 'Cumulative Passing Rate (Relative)']:
                 bg = value_to_color(df.iloc[row_idx - 1, col_idx])
                 if bg is None:
                     continue
@@ -390,7 +389,7 @@ class ProbabilisticEvaluator:
 
         plt.tight_layout()
         plt.show()
-        
+
     def displayVminVmax(self):
         """
         Display voxel-wise minimum and maximum dose images.

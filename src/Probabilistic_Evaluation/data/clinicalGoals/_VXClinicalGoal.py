@@ -26,10 +26,10 @@ class VXClinicalGoal(AbstractClinicalGoal):
         The dose (in Gy) associated with the clinical goal.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, **kwargs):
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, priority: int = 0, **kwargs):
         if prescription > 1:
             raise ValueError("Prescription must be given in percentage (0-1).")
-        super().__init__(prescription, mask, maskName, lower_is_better)
+        super().__init__(prescription, mask, maskName, lower_is_better, priority)
         self._dose = kwargs.get('dose', None)  # Dose in Gy
         if self._dose is None:
             raise ValueError("Dose must be provided for VX ClinicalGoal.")
