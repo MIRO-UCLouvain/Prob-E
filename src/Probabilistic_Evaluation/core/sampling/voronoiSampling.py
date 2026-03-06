@@ -17,6 +17,8 @@ class VoronoiSampling(AbstractsamplingMethod):
         The Voronoi points generated within the specified bounds and spacing.
     voronoiProbabilities : np.ndarray
         The probabilities associated with each Voronoi point.
+    probabilityMass : float
+        The cumulative probability mass to retain when reducing the number of scenarios (between 0 and 1).
 
     Methods
     -------
@@ -26,13 +28,13 @@ class VoronoiSampling(AbstractsamplingMethod):
         Retrieve the precomputed Voronoi points and their probabilities.
     """
 
-    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, max_displacements: np.ndarray, spacing: np.ndarray,reducedSetCumulProba:float=None):
+    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, max_displacements: np.ndarray, spacing: np.ndarray,probabilityMass:float=None):
         super().__init__(uncertaintyModel)
         if max_displacements.shape != spacing.shape:
             raise ValueError("max_displacements and spacing must have the same shape.")
         self._voronoiPoints = None
         self._voronoiProbabilities = None
-        self.reducedSetCumulProba = reducedSetCumulProba
+        self.probabilityMass = probabilityMass
         self._generateVoronoiSampling(max_displacements, spacing, computing_method='analytical')
 
     @property
