@@ -105,12 +105,17 @@ class ProbabilisticEvaluator:
         Evaluate scenarios and compute clinical goal values and passing rates.
         """
 
+        n_scenarios = len(self.scenarios)
+        for goal in self.clinical_goals:
+            goal.valueList = [None] * n_scenarios
+            goal.successList = [None] * n_scenarios
+
         threads = []
         for i, scenario in enumerate(self.scenarios):
             while threading.active_count() > self.nThreads:
                 time.sleep(0.1)
             print(f"Starting thread for scenario {i+1}/{len(self.scenarios)}")
-            t = threading.Thread(target=self.compute_and_evaluate_scenario, args=(scenario,))
+            t = threading.Thread(target=self.compute_and_evaluate_scenario, args=(i, scenario))
             threads.append(t)
             t.start()
 
@@ -121,14 +126,14 @@ class ProbabilisticEvaluator:
         if self.calc_CummulPR:
             self.calculate_cummulPR()
 
-    def compute_and_evaluate_scenario(self, scenario):
+    def compute_and_evaluate_scenario(self, scenario_idx, scenario):
         #print("Evaluating scenario with displacement:", scenario.displacement)
         scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
         dvh_dict = {}
         for mask in self.patientData.maskDict.keys():
             dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
         for goal in self.clinical_goals:
-            goal.compute(dvh_dict[goal.maskName])
+            goal.compute(dvh_dict[goal.maskName], scenario_idx=scenario_idx)
         if self.calc_VWMin:
             self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
         if self.calc_VWMax:
@@ -230,9 +235,16 @@ class ProbabilisticEvaluator:
         for i, goal in enumerate(self.clinical_goals):
             print(goal)
             print(self.PR[i])
+            if zero_idx is not None and len(goal.valueList) > zero_idx:
+                nominal_value = "{:.3f}".format(goal.valueList[zero_idx])
+                nominal_passed = bool(goal.successList[zero_idx]) if len(goal.successList) > zero_idx else None
+            else:
+                nominal_value = "N/A"
+                nominal_passed = None
             data.append({
                 'Clinical Goal': goal.__str__(),
-                'Nominal Scenario': "{:.3f}".format(goal.valueList[zero_idx]),
+                'Nominal Scenario': nominal_value,
+                'Nominal Scenario Passed': nominal_passed,
                 'Passing Rate': "{:.3f}".format(self.PR[i]),
                 'Cummulative Passing Rate': "{:.3f}".format(self.CummulPR[i]),
                 'Cummulative Passing Rate (Relative)': "{:.3f}".format(self.CummulPR_rel[i])
@@ -241,6 +253,8 @@ class ProbabilisticEvaluator:
         for i, goal in enumerate(self.clinical_goals):
             for j, success in enumerate(goal.successList):
                 data[i][f'Scenario {j+1} Success'] = success
+            for j, scenario_prob in enumerate(self.prob_list):
+                data[i][f'Scenario {j+1} Probability'] = float(scenario_prob)
 
         df = pd.DataFrame(data)
         # check if outpath exist and add number at the end if it does
