@@ -42,8 +42,8 @@ class AbstractClinicalGoal(ABC):
         self._maskName: str = maskName
      
         self._priority: int = priority
-        self.valueList: list = []
-        self.successList: list = []
+        self.valueList: np.ndarray = np.array([])
+        self.successList: np.ndarray = np.array([])
     
     @property
     def prescription(self) -> float:
@@ -151,18 +151,10 @@ class AbstractClinicalGoal(ABC):
         """
         value = self.compute_value(dvh)
         success = self.compute_success(value)
-        if scenario_idx is None:
-            self.valueList.append(value)
-            self.successList.append(success)
-            return
 
-        if scenario_idx < 0:
-            raise ValueError("scenario_idx must be >= 0")
-
-        if scenario_idx >= len(self.valueList):
-            self.valueList.extend([None] * (scenario_idx + 1 - len(self.valueList)))
-        if scenario_idx >= len(self.successList):
-            self.successList.extend([None] * (scenario_idx + 1 - len(self.successList)))
-
-        self.valueList[scenario_idx] = value
-        self.successList[scenario_idx] = success
+        if scenario_idx is not None:
+            self.valueList[scenario_idx] = value
+            self.successList[scenario_idx] = success
+        else:
+            self.valueList = np.append(self.valueList, value)
+            self.successList = np.append(self.successList, success)

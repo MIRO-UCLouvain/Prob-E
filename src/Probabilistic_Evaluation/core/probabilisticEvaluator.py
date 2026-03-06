@@ -25,7 +25,7 @@ class ProbabilisticEvaluator:
         Whether to compute voxel-wise minimum dose across scenarios.
     computeVWMax : bool, optional
         Whether to compute voxel-wise maximum dose across scenarios.
-    computeCumulativePassingRate : bool, optional
+    computeCumulativePassingRates : bool, optional
         Whether to compute cumulative passing rates.
     scenarios : list
         A list of generated scenarios for evaluation.
@@ -47,13 +47,13 @@ class ProbabilisticEvaluator:
         Evaluate scenarios and compute clinical goal values and passing rates, returning a summary table as a DataFrame.
     """
 
-    def __init__(self, PatientData:PatientData, sampler:AbstractsamplingMethod,kwargs):
+    def __init__(self, PatientData:PatientData, sampler:AbstractsamplingMethod,**kwargs):
         self.patientData = PatientData
         self.sampler = sampler
         self.scenarios = ScenariosGenerator(sampling_method=self.sampler).scenarios_list
         self.computeVWMin = kwargs.get('computeVWMin', False)
         self.computeVWMax = kwargs.get('computeVWMax', False)
-        self.computeCumulativePassingRate = kwargs.get('computeCumulativePassingRate', False)
+        self.computeCumulativePassingRates = kwargs.get('computeCumulativePassingRate', False)
 
         self.prob_list = np.array([s.probability for s in self.scenarios])
 
@@ -86,8 +86,8 @@ class ProbabilisticEvaluator:
 
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
-            goal.valueList = [None] * n_scenarios
-            goal.successList = [None] * n_scenarios
+            goal.valueList = np.empty(n_scenarios)
+            goal.successList = np.empty(n_scenarios, dtype=bool)
 
         threads = []
         for i, scenario in enumerate(self.scenarios):
@@ -101,18 +101,20 @@ class ProbabilisticEvaluator:
         for t in threads:
             t.join()
 
-        passingRates = self.computePassingRate()
-        cumulativePassingRates = self.computeCumulativePassingRate() if self.computeCumulativePassingRate else None
-        cumulativeRelativePassingRates = self.computeCumulativeRelativePassingRate() if self.computeCumulativePassingRate else None
+        passingRates = self.passingRates()
+        cumulativePassingRates = self.cumulativePassingRates() if self.computeCumulativePassingRates else None
+        cumulativeRelativePassingRates = self.cumulativeRelativePassingRates() if self.computeCumulativePassingRates else None
         table = self.createPassingRateTable(passingRates, cumulativePassingRates, cumulativeRelativePassingRates)
         return table
 
-    def compute_and_evaluate_scenario(self, scenario):
+    def compute_and_evaluate_scenario(self,scenario_idx, scenario):
         """
             Compute the dose image for a scenario, evaluate clinical goals, and update voxel-wise min/max if enabled.
 
         Parameters
         ----------
+        scenario_idx : int
+            The index of the scenario being evaluated.
         scenario : Scenario
             The scenario object containing displacement and probability information for evaluation.
 
@@ -126,14 +128,14 @@ class ProbabilisticEvaluator:
         for mask in self.patientData.maskDict.keys():
             dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
         for goal in self.patientData.clinicalGoalsList:
-            goal.compute(dvh_dict[goal.maskName])
+            goal.compute(dvh_dict[goal.maskName], scenario_idx=scenario_idx)
         if self.computeVWMin:
             self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
         if self.computeVWMax:
             self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
         scenario.delete_doseImage()
 
-    def computePassingRate(self)->list:
+    def passingRates(self)->list:
         """
         Compute passing rates for each clinical goal.
 
@@ -144,13 +146,12 @@ class ProbabilisticEvaluator:
         """
         passingRates = []
         for goal in self.patientData.clinicalGoalsList:
-            success_arr = np.array(goal.successList)
-            p = np.sum(self.prob_list[success_arr])
+            p = np.sum(self.prob_list[goal.successList])
             passingRates.append(p)
         return passingRates
 
 
-    def computeCumulativePassingRate(self)->list:
+    def cumulativePassingRates(self)->list:
         """
         Compute cumulative passing rates for ordered clinical goals.
 
@@ -164,14 +165,13 @@ class ProbabilisticEvaluator:
         cumulativeSuccessList = np.ones_like(self.scenarios, dtype=bool)
         cumulativePassingRateList = []
         for goal in self.patientData.clinicalGoalsList:
-            success_arr = np.array(goal.successList)
-            cumulativeSuccessList = np.logical_and(cumulativeSuccessList, success_arr)
+            cumulativeSuccessList = np.logical_and(cumulativeSuccessList, goal.successList)
             cumulativePassingRate = np.sum(self.prob_list[cumulativeSuccessList])
             cumulativePassingRateList.append(cumulativePassingRate)
 
         return cumulativePassingRateList
 
-    def computeCumulativeRelativePassingRate(self)->list:
+    def cumulativeRelativePassingRates(self)->list:
         """
         Compute relative cumulative passing rates for ordered clinical goals.
 
@@ -185,8 +185,7 @@ class ProbabilisticEvaluator:
         cumulativeSuccessList = np.ones_like(self.scenarios, dtype=bool)
         cumulativeRelativePassingRateList = []
         for goal in self.patientData.clinicalGoalsList:
-            success_arr = np.array(goal.successList)
-            cumulativeSuccessList = np.logical_and(cumulativeSuccessList, success_arr)
+            cumulativeSuccessList = np.logical_and(cumulativeSuccessList, goal.successList)
             cumulativeRelativePassingRate = np.sum(self.prob_list[success_arr])/np.sum(self.prob_list[cumulativeSuccessList]) if np.sum(self.prob_list[cumulativeSuccessList]) > 0 else 0.0
             cumulativeRelativePassingRateList.append(cumulativeRelativePassingRate)
 
@@ -232,7 +231,7 @@ class ProbabilisticEvaluator:
 
             if cumulativeRelativePassingRates is not None:
                 row["Cumulative Relative Passing Rate"] = cumulativeRelativePassingRates[i]
-            row["Success Array"] = np.array(goal.successList)
+            row["Success Array"] = goal.successList
             rows.append(row)
 
         table = pd.DataFrame(rows, columns=headers)
@@ -321,7 +320,7 @@ class ProbabilisticEvaluator:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(html)
 
-    def saveTableToCSV(self, table: pd.DataFrame, filepath: str = "passing_rate_table.csv",save_success_array: bool = False):
+    def saveTableToCSV(self, table: pd.DataFrame, filepath: str = "passing_rate_table.csv",save_success_array: bool = True):
         """
         Save the passing rate table as a CSV file.
 
@@ -332,7 +331,7 @@ class ProbabilisticEvaluator:
         filepath : str, optional
             The file path where the CSV table will be saved. Default is "passing_rate_table.csv".
         save_success_array : bool, optional
-            Whether to include the success array in the CSV file. Default is False.
+            Whether to include the success array in the CSV file. Default is True.
 
         Returns
         -------
@@ -495,7 +494,7 @@ class ProbabilisticEvaluator:
                 row['Scenario [0,0,0]'] = "{:.3f}".format(goal.valueList[zero_idx])
             else:
                 row['Scenario [0,0,0]'] = "N/A"
-            if self.computeCumulativePassingRate:
+            if self.computeCumulativePassingRates:
                 row['Cumulative Passing Rate'] = "{:.3f}".format(self.CummulPR[i])
                 row['Cumulative Passing Rate (Relative)'] = "{:.3f}".format(self.CummulPR_rel[i])
             data.append(row)
