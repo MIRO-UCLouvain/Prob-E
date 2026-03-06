@@ -1,5 +1,3 @@
-from docutils.nodes import header
-
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
 from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
@@ -42,7 +40,7 @@ class ProbabilisticEvaluator:
         or None if no nominal scenario is found.
     nThreads : int
         The number of threads to use for parallel evaluation, determined based on the number of CPU cores if not specified.
-    
+
     Methods
     -------
     evaluate() -> pd.DataFrame
@@ -79,19 +77,24 @@ class ProbabilisticEvaluator:
     def evaluate(self)->pd.DataFrame:
         """
         Evaluate scenarios and compute clinical goal values and passing rates.
-        
+
         Returns
         -------
-        pd.DataFrame     
+        pd.DataFrame
             A DataFrame containing clinical goals, nominal values, passing rates, and cumulative passing rates if computed
         """
+
+        n_scenarios = len(self.scenarios)
+        for goal in self.patientData.clinicalGoalsList:
+            goal.valueList = [None] * n_scenarios
+            goal.successList = [None] * n_scenarios
 
         threads = []
         for i, scenario in enumerate(self.scenarios):
             while threading.active_count() > self.nThreads:
                 time.sleep(0.1)
             print(f"Starting thread for scenario {i+1}/{len(self.scenarios)}")
-            t = threading.Thread(target=self.compute_and_evaluate_scenario, args=(scenario,))
+            t = threading.Thread(target=self.compute_and_evaluate_scenario, args=(i, scenario))
             threads.append(t)
             t.start()
 
@@ -107,7 +110,7 @@ class ProbabilisticEvaluator:
     def compute_and_evaluate_scenario(self, scenario):
         """
             Compute the dose image for a scenario, evaluate clinical goals, and update voxel-wise min/max if enabled.
-            
+
         Parameters
         ----------
         scenario : Scenario
@@ -133,7 +136,7 @@ class ProbabilisticEvaluator:
     def computePassingRate(self)->list:
         """
         Compute passing rates for each clinical goal.
-        
+
         Returns
         -------
         list
@@ -150,7 +153,7 @@ class ProbabilisticEvaluator:
     def computeCumulativePassingRate(self)->list:
         """
         Compute cumulative passing rates for ordered clinical goals.
-        
+
         Returns
         -------
         list
@@ -171,7 +174,7 @@ class ProbabilisticEvaluator:
     def computeCumulativeRelativePassingRate(self)->list:
         """
         Compute relative cumulative passing rates for ordered clinical goals.
-        
+
         Returns
         -------
         list
@@ -192,7 +195,7 @@ class ProbabilisticEvaluator:
     def createPassingRateTable(self, passingRates: list,cumulativePassingRates=None,cumulativeRelativePassingRates=None) -> pd.DataFrame:
         """
         Create a DataFrame table summarizing clinical goals, nominal values, passing rates, and cumulative passing rates if computed.
-        
+
         Parameters
         ----------
         passingRates : list
@@ -238,7 +241,7 @@ class ProbabilisticEvaluator:
     def createHTMLtable(self, table: pd.DataFrame):
         """
         Create an HTML representation of the passing rate table with color coding for better visualization.
-            
+
         Parameters
         ----------
         table : pd.DataFrame
@@ -301,7 +304,7 @@ class ProbabilisticEvaluator:
     def saveTableToHTML(self,table: pd.DataFrame, filepath: str = "passing_rate_table.html"):
         """
         Save the passing rate table as an HTML file with styling.
-        
+
         Parameters
         ----------
         table : pd.DataFrame
@@ -321,7 +324,7 @@ class ProbabilisticEvaluator:
     def saveTableToCSV(self, table: pd.DataFrame, filepath: str = "passing_rate_table.csv",save_success_array: bool = False):
         """
         Save the passing rate table as a CSV file.
-        
+
         Parameters
         ----------
         table : pd.DataFrame
@@ -330,7 +333,7 @@ class ProbabilisticEvaluator:
             The file path where the CSV table will be saved. Default is "passing_rate_table.csv".
         save_success_array : bool, optional
             Whether to include the success array in the CSV file. Default is False.
-        
+
         Returns
         -------
         None
@@ -422,9 +425,16 @@ class ProbabilisticEvaluator:
         for i, goal in enumerate(self.patientData.clinicalGoalsList):
             print(goal)
             print(self.PR[i])
+            if zero_idx is not None and len(goal.valueList) > zero_idx:
+                nominal_value = "{:.3f}".format(goal.valueList[zero_idx])
+                nominal_passed = bool(goal.successList[zero_idx]) if len(goal.successList) > zero_idx else None
+            else:
+                nominal_value = "N/A"
+                nominal_passed = None
             data.append({
                 'Clinical Goal': goal.__str__(),
-                'Nominal Scenario': "{:.3f}".format(goal.valueList[zero_idx]),
+                'Nominal Scenario': nominal_value,
+                'Nominal Scenario Passed': nominal_passed,
                 'Passing Rate': "{:.3f}".format(self.PR[i]),
                 'Cumulative Passing Rate': "{:.3f}".format(self.CummulPR[i]),
                 'Cumulative Passing Rate (Relative)': "{:.3f}".format(self.CummulPR_rel[i])
@@ -433,6 +443,8 @@ class ProbabilisticEvaluator:
         for i, goal in enumerate(self.patientData.clinicalGoalsList):
             for j, success in enumerate(goal.successList):
                 data[i][f'Scenario {j+1} Success'] = success
+            for j, scenario_prob in enumerate(self.prob_list):
+                data[i][f'Scenario {j+1} Probability'] = float(scenario_prob)
 
         df = pd.DataFrame(data)
         # check if outpath exist and add number at the end if it does

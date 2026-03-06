@@ -136,7 +136,7 @@ class AbstractClinicalGoal(ABC):
         else:
             return value >= self._prescription
 
-    def compute(self,dvh) -> None:
+    def compute(self, dvh, scenario_idx: int | None = None) -> None:
         """
         Compute the clinical goal value and success status based on the provided DVH.
 
@@ -151,5 +151,18 @@ class AbstractClinicalGoal(ABC):
         """
         value = self.compute_value(dvh)
         success = self.compute_success(value)
-        self.valueList.append(value)
-        self.successList.append(success)
+        if scenario_idx is None:
+            self.valueList.append(value)
+            self.successList.append(success)
+            return
+
+        if scenario_idx < 0:
+            raise ValueError("scenario_idx must be >= 0")
+
+        if scenario_idx >= len(self.valueList):
+            self.valueList.extend([None] * (scenario_idx + 1 - len(self.valueList)))
+        if scenario_idx >= len(self.successList):
+            self.successList.extend([None] * (scenario_idx + 1 - len(self.successList)))
+
+        self.valueList[scenario_idx] = value
+        self.successList[scenario_idx] = success
