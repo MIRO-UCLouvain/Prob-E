@@ -33,6 +33,6 @@ class ScenariosGenerator:
         None.
         """
         displacements, probabilities = self.sampling_method.analyticalSampling()
-        for i in range(len(displacements)):
-            scenario = Scenario(displacement=displacements[i], probability=probabilities[i])
+        for displacement, probability in zip(displacements, probabilities):
+            scenario = Scenario(displacement=displacement, probability=probability)
             self.scenarios_list.append(scenario)

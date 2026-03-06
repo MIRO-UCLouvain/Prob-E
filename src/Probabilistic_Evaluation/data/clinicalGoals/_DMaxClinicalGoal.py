@@ -32,7 +32,7 @@ class DMaxClinicalGoal(AbstractClinicalGoal):
             comparison = "<="
         else:
             comparison = ">="
-        return f"{self.maskName}:DMAX{comparison}{self.prescription}"
+        return f"DMAX{comparison}{self.prescription}"
 
     def compute_value(self, dvh) -> float:
         """
