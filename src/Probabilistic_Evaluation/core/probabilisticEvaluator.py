@@ -186,7 +186,7 @@ class ProbabilisticEvaluator:
         cumulativeRelativePassingRateList = []
         for goal in self.patientData.clinicalGoalsList:
             cumulativeSuccessList = np.logical_and(cumulativeSuccessList, goal.successList)
-            cumulativeRelativePassingRate = np.sum(self.prob_list[success_arr])/np.sum(self.prob_list[cumulativeSuccessList]) if np.sum(self.prob_list[cumulativeSuccessList]) > 0 else 0.0
+            cumulativeRelativePassingRate = np.sum(self.prob_list[goal.successList])/np.sum(self.prob_list[cumulativeSuccessList]) if np.sum(self.prob_list[cumulativeSuccessList]) > 0 else 0.0
             cumulativeRelativePassingRateList.append(cumulativeRelativePassingRate)
 
         return cumulativeRelativePassingRateList
