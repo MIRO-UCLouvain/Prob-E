@@ -240,6 +240,43 @@ class ProbabilisticEvaluator:
         table = pd.DataFrame(rows, columns=headers)
         return table
 
+    def recomputePassingRateTable(self, df: pd.DataFrame):
+        """
+        Recompute cumulative passing rates in the table based on the success arrays and probabilities, allowing for dynamic updates if clinical goals are modified.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            A DataFrame containing clinical goals, nominal values, passing rates, and cumulative passing rates if computed, along with the success array for each clinical goal.
+
+        Returns
+        -------
+        pd.DataFrame
+            An updated DataFrame with recomputed cumulative passing rates based on the success arrays and probabilities.
+
+        """
+
+        cumulative_success = np.ones(len(self.prob_list), dtype=bool)
+
+        cum_rates = []
+        cum_rel_rates = []
+
+        for _, row in df.iterrows():
+            success = row["Success Array"]
+
+            cumulative_success = np.logical_and(cumulative_success, success)
+
+            cum = np.sum(self.prob_list[cumulative_success])
+            cum_rates.append(cum)
+
+            rel = np.sum(self.prob_list[success]) / cum if cum > 0 else 0
+            cum_rel_rates.append(rel)
+
+        df["Cumulative Passing Rate"] = cum_rates
+        df["Cumulative Relative Passing Rate"] = cum_rel_rates
+
+        return df
+
     def createHTMLtable(self, table: pd.DataFrame):
         """
         Create an HTML representation of the passing rate table with color coding for better visualization.
