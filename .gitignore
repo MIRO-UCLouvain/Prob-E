@@ -10,3 +10,9 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 *.csv
+
+# Ignore IDE specific folders and files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
