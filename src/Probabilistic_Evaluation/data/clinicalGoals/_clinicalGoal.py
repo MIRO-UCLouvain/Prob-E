@@ -144,6 +144,8 @@ class AbstractClinicalGoal(ABC):
         ----------
         dvh : DVH
             The Dose-Volume Histogram of the scenario.
+        scenario_idx : int, optional
+            The index of the scenario for which to store the computed value and success status. If None, the values will be appended to the lists.
 
         Returns
         -------
