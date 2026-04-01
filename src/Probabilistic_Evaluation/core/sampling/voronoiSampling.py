@@ -215,14 +215,9 @@ class VoronoiSampling(AbstractsamplingMethod):
 
         return self._voronoiPoints, self._voronoiProbabilities
 
-    def reduceNumberOfScenarios(self, cumulative_probability: float = 0.99):
+    def reduceNumberOfScenarios(self):
         """
         Reduce the number of Voronoi scenarios based on a specified cumulative probability threshold.
-
-        Parameters
-        ----------
-        cumulative_probability : float
-            The cumulative probability threshold (between 0 and 1).
 
         Returns
         -------
@@ -231,15 +226,14 @@ class VoronoiSampling(AbstractsamplingMethod):
         reduced_probabilities : np.ndarray
             The probabilities associated with the reduced Voronoi points.
         """
-        cumulative_probability = self.probabilityMass
-        if not (0 < cumulative_probability <= 1):
+        if not (0 < self.probabilityMass <= 1):
             raise ValueError("Cumulative probability must be between 0 and 1.")
 
         sorted_indices = np.argsort(self._voronoiProbabilities)[::-1]
         sorted_probabilities = self._voronoiProbabilities[sorted_indices]
         cumulative_probs = np.cumsum(sorted_probabilities)
 
-        num_cells = np.searchsorted(cumulative_probs, cumulative_probability, side='right') + 1
+        num_cells = np.searchsorted(cumulative_probs, self.probabilityMass, side='right') + 1
 
         reduced_indices = sorted_indices[:num_cells]
         reduced_points = self._voronoiPoints[reduced_indices]
