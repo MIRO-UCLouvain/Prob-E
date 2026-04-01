@@ -174,8 +174,8 @@ class VoronoiSampling(AbstractsamplingMethod):
         self._voronoiPoints = self._generateVoronoiPoints(bounds, spacing)
         self._voronoiProbabilities = self._generateVoronoiProbabilities(self._voronoiPoints, computing_method, spacing)
 
-        if self.reducedSetCumulProba is not None:
-            self._voronoiPoints, self._voronoiProbabilities = self.reduceNumberOfScenarios(cumulative_probability=self.reducedSetCumulProba)
+        if self.probabilityMass is not None:
+            self._voronoiPoints, self._voronoiProbabilities = self.reduceNumberOfScenarios(cumulative_probability=self.probabilityMass)
 
     def MCsampling(self, **kwargs):
         """
@@ -231,7 +231,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         reduced_probabilities : np.ndarray
             The probabilities associated with the reduced Voronoi points.
         """
-        cumulative_probability = self.reducedSetCumulProba
+        cumulative_probability = self.probabilityMass
         if not (0 < cumulative_probability <= 1):
             raise ValueError("Cumulative probability must be between 0 and 1.")
 
