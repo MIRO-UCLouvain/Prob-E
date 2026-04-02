@@ -56,10 +56,6 @@ class DicomReader():
         for key in self.data:
             if isinstance(key, CTImage):
                 self.CTImage = key
-                if key.imageOrientationPatient == [-1, 0, 0, 0, -1, 0]:
-                    print("CT Image is in head-first prone orientation. Reorienting to head-first supine.")
-                    key.imageArray = np.flip(key.imageArray, (0,1))
-                    key.origin = (-key.origin[0], -key.origin[1], key.origin[2])
                 CT = key.imageArray
                 spacing = key.spacing
                 print(f"CT Image shape: {CT.shape}, Spacing: {spacing}")
