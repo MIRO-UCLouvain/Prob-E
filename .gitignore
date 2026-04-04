@@ -10,6 +10,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 *.csv
+*.html
 
 # Ignore IDE specific folders and files
 .vscode/
