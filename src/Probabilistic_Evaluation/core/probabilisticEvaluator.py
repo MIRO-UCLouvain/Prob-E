@@ -9,6 +9,7 @@ import multiprocessing
 import time
 import numpy as np
 import pandas as pd
+import scipy as sp
 
 class ProbabilisticEvaluator:
 
@@ -83,7 +84,10 @@ class ProbabilisticEvaluator:
         pd.DataFrame
             A DataFrame containing clinical goals, nominal values, passing rates, and cumulative passing rates if computed
         """
-
+        if self.sampler.UncertaintyModel.rand_parameters is not None:
+            dose_image = self.blur_dose()
+            self.patientData.doseImage = dose_image
+            print("Updated patient dose image with blurred dose")
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
             goal.valueList = np.empty(n_scenarios)
@@ -123,6 +127,7 @@ class ProbabilisticEvaluator:
         None
 
         """
+        
         scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
         dvh_dict = {}
         for mask in self.patientData.maskDict.keys():
@@ -276,7 +281,34 @@ class ProbabilisticEvaluator:
         df["Cumulative Relative Passing Rate"] = cum_rel_rates
 
         return df
+    def blur_dose(self):
+        """
+        Apply Gaussian blurring to the dose map based on the random setup error parameters.
 
+        Parameters
+        ----------
+        dosemap : np.ndarray
+            A 3D array representing the original dose map.
+        rand_parameters : dict
+            A dictionary containing the standard deviations for blurring in x, y, and z directions (in mm):
+            - 'sigma_x': Standard deviation in x direction
+            - 'sigma_y': Standard deviation in y direction
+            - 'sigma_z': Standard deviation in z direction
+
+        Returns
+        -------
+        np.ndarray
+            A 3D array representing the blurred dose map.
+        """
+        dosemap = self.patientData.doseImage
+        rand_parameters = self.sampler.UncertaintyModel.rand_parameters
+        
+        sigma_x = rand_parameters['sigma_x']
+        sigma_y = rand_parameters['sigma_y']
+        sigma_z = rand_parameters['sigma_z']
+        blurred_dosemap = sp.ndimage.gaussian_filter(dosemap, sigma=[sigma_x, sigma_y, sigma_z] / self.patientData.spacing)
+        return blurred_dosemap
+    
     def createHTMLtable(self, table: pd.DataFrame):
         """
         Create an HTML representation of the passing rate table with color coding for better visualization.

@@ -15,21 +15,46 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
     ----------
     name : str (default: "Gaussian3DUncertaintyModel")
         The name of the uncertainty model.
-    parameters : dict
-        A dictionary containing the parameters of the Gaussian model:
+    n_fractions : int (default: 500)
+        The number of treatment fractions to consider for the uncertainty model.
+    marginsize : float (default: 5)
+        The PTV margin size in mm (isotropically), which is used to calculate the standard deviation of the Gaussian distribution
+    blur_dose : bool (default: False)
+        Whether the dose will be blurred to account random setup errors (if True, only systematic errors are considered in the uncertainty model,
+          as the blurring will already account for the random uncertainty effect)
+    sys_parameters : dict
+        A dictionary containing the systematic setup error parameters of the Gaussian model:
         - 'mu_x': Mean in x direction (default: 0)
         - 'mu_y': Mean in y direction (default: 0)
         - 'mu_z': Mean in z direction (default: 0)
         - 'sigma_x': Standard deviation in x direction (default: 5/3.2)
         - 'sigma_y': Standard deviation in y direction (default: 5/3.2)
         - 'sigma_z': Standard deviation in z direction (default: 5/3.2).
+
+    rand_parameters : dict
+        A dictionary to hold random setup error parameters of the Gaussian model:
+        - 'sigma_x': Standard deviation in x direction 
+        - 'sigma_y': Standard deviation in y direction 
+        - 'sigma_z': Standard deviation in z direction 
+    
     """
 
-    def __init__(self, parameters: dict = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': 5 / (3.2), 'sigma_y': 5 / (3.2),
-                                           'sigma_z': 5 / (3.2)}):
+    def __init__(self, marginsize=5, n=500, do_random=True):
         super().__init__()
         self.name: str = "Gaussian3DUncertaintyModel"
-        self.parameters: dict = parameters
+        self.n_fractions = n
+        self.marginsize = marginsize
+        self.do_random = do_random
+        if self.do_random:
+            #dose will be blurred, so we need to account for the number of fractions and random errors in the sigma calculation
+            # we assume systematic and random sigma are the same
+            sigma = marginsize/(2.5*np.sqrt(1+1/n)+0.7)
+            self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
+            self.rand_parameters = {'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
+        else:
+            # if we do not consider random errors, we only account for systematic errors
+            self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': marginsize/2.5, 'sigma_y': marginsize/2.5, 'sigma_z': marginsize/2.5}
+            self.rand_parameters = None
 
     def pdf(self, x):
         """
@@ -45,12 +70,12 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         float
             The value of the PDF at point x.
         """
-        mu_x = self.parameters['mu_x']
-        mu_y = self.parameters['mu_y']
-        mu_z = self.parameters['mu_z']
-        sigma_x = self.parameters['sigma_x']
-        sigma_y = self.parameters['sigma_y']
-        sigma_z = self.parameters['sigma_z']
+        mu_x = self.sys_parameters['mu_x']
+        mu_y = self.sys_parameters['mu_y']
+        mu_z = self.sys_parameters['mu_z']
+        sigma_x = self.sys_parameters['sigma_x']
+        sigma_y = self.sys_parameters['sigma_y']
+        sigma_z = self.sys_parameters['sigma_z']
 
         coeff = 1 / ((2 * np.pi) ** 1.5 * sigma_x * sigma_y * sigma_z)
         exponent = -(((x[0] - mu_x) ** 2) / (2 * sigma_x ** 2) +
@@ -73,12 +98,12 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         float
             The value of the CDF at point x.
         """
-        mu_x = self.parameters['mu_x']
-        mu_y = self.parameters['mu_y']
-        mu_z = self.parameters['mu_z']
-        sigma_x = self.parameters['sigma_x']
-        sigma_y = self.parameters['sigma_y']
-        sigma_z = self.parameters['sigma_z']
+        mu_x = self.sys_parameters['mu_x']
+        mu_y = self.sys_parameters['mu_y']
+        mu_z = self.sys_parameters['mu_z']
+        sigma_x = self.sys_parameters['sigma_x']
+        sigma_y = self.sys_parameters['sigma_y']
+        sigma_z = self.sys_parameters['sigma_z']
 
         cdf_x = 0.5 * (1 + erf((x[0] - mu_x) / (sigma_x * np.sqrt(2))))
         cdf_y = 0.5 * (1 + erf((x[1] - mu_y) / (sigma_y * np.sqrt(2))))
@@ -100,12 +125,12 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         ndarray
             An array of shape (n, 3) containing n random samples.
         """
-        mu_x = self.parameters['mu_x']
-        mu_y = self.parameters['mu_y']
-        mu_z = self.parameters['mu_z']
-        sigma_x = self.parameters['sigma_x']
-        sigma_y = self.parameters['sigma_y']
-        sigma_z = self.parameters['sigma_z']
+        mu_x = self.sys_parameters['mu_x']
+        mu_y = self.sys_parameters['mu_y']
+        mu_z = self.sys_parameters['mu_z']
+        sigma_x = self.sys_parameters['sigma_x']
+        sigma_y = self.sys_parameters['sigma_y']
+        sigma_z = self.sys_parameters['sigma_z']
 
         mean = [mu_x, mu_y, mu_z]
         cov = [[sigma_x ** 2, 0, 0],
@@ -133,10 +158,10 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         float
             The value of the bounded integral over the specified region.
         """
-        if self.parameters['mu_x'] == self.parameters['mu_y'] == self.parameters['mu_z'] == 0:
-            integral_x = self.bounded1DIntegral(a[0], b[0], 0, self.parameters['sigma_x'])
-            integral_y = self.bounded1DIntegral(a[1], b[1], 0, self.parameters['sigma_y'])
-            integral_z = self.bounded1DIntegral(a[2], b[2], 0, self.parameters['sigma_z'])
+        if self.sys_parameters['mu_x'] == self.sys_parameters['mu_y'] == self.sys_parameters['mu_z'] == 0:
+            integral_x = self.bounded1DIntegral(a[0], b[0], 0, self.sys_parameters['sigma_x'])
+            integral_y = self.bounded1DIntegral(a[1], b[1], 0, self.sys_parameters['sigma_y'])
+            integral_z = self.bounded1DIntegral(a[2], b[2], 0, self.sys_parameters['sigma_z'])
             return integral_x * integral_y * integral_z
         else:
             raise NotImplementedError("Bounded integral for non-zero mean is not implemented yet.")

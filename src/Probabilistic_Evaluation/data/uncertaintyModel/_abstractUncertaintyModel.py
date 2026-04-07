@@ -8,14 +8,17 @@ class AbstractUncertaintyModel(ABC):
     ----------
     name : str
         The name of the uncertainty model.
-    parameters : dict
-        A dictionary to hold model parameters.
+    sys_parameters : dict
+        A dictionary to hold systematic setup error parameters.
+    rand_parameters : dict
+        A dictionary to hold random setup error parameters.
     """
 
     def __init__(self):
         super().__init__()
         self.name: str = "AbstractUncertaintyModel"
-        self.parameters: dict = {}
+        self.sys_parameters: dict = {}
+        self.rand_parameters: dict = {}
 
     @abstractmethod
     def pdf(self, x):
