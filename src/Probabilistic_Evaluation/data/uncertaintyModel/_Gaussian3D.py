@@ -17,9 +17,9 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         The name of the uncertainty model.
     n_fractions : int (default: 500)
         The number of treatment fractions to consider for the uncertainty model.
-    marginsize : float (default: 5)
+    marginSize : float (default: 5)
         The PTV margin size in mm (isotropically), which is used to calculate the standard deviation of the Gaussian distribution
-    blur_dose : bool (default: False)
+    simulateRandom : bool (default: False)
         Whether the dose will be blurred to account random setup errors (if True, only systematic errors are considered in the uncertainty model,
           as the blurring will already account for the random uncertainty effect)
     sys_parameters : dict
@@ -39,21 +39,20 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
     
     """
 
-    def __init__(self, marginsize=5, n=500, do_random=True):
+    def __init__(self, marginSize=5, n=500, simulateRandom=False):
         super().__init__()
         self.name: str = "Gaussian3DUncertaintyModel"
         self.n_fractions = n
-        self.marginsize = marginsize
-        self.do_random = do_random
-        if self.do_random:
+        self.marginSize = marginSize
+        if simulateRandom:
             #dose will be blurred, so we need to account for the number of fractions and random errors in the sigma calculation
             # we assume systematic and random sigma are the same
-            sigma = marginsize/(2.5*np.sqrt(1+1/n)+0.7)
+            sigma = marginSize/(2.5*np.sqrt(1+1/n)+0.7)
             self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
             self.rand_parameters = {'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
         else:
             # if we do not consider random errors, we only account for systematic errors
-            self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': marginsize/2.5, 'sigma_y': marginsize/2.5, 'sigma_z': marginsize/2.5}
+            self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': marginSize/2.5, 'sigma_y': marginSize/2.5, 'sigma_z': marginSize/2.5}
             self.rand_parameters = None
 
     def pdf(self, x):
