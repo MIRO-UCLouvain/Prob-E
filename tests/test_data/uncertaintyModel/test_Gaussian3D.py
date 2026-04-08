@@ -9,20 +9,36 @@ def simple_model():
 
 def test_initialization(simple_model):
     assert simple_model.name == "Gaussian3DUncertaintyModel"
-    expected_params = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': 5 / (3.2), 'sigma_y': 5 / (3.2), 'sigma_z': 5 / (3.2)}
-    assert simple_model.parameters == expected_params
+    marginSize = 5
+    expected_params = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': marginSize/2.5, 'sigma_y': marginSize/2.5, 'sigma_z': marginSize/2.5}
+    for key in expected_params:
+        assert key in simple_model.sys_parameters, f"Parameter {key} should be in sys_parameters"
+        assert np.isclose(simple_model.sys_parameters[key], expected_params[key]), f"Parameter {key} should be {expected_params[key]}, got {simple_model.sys_parameters[key]}"
+    assert simple_model.rand_parameters is None
+
+def test_initialization_with_custom_params():
+    model = Gaussian3DUncertaintyModel(marginSize=4,n=30,simulateRandom=True)
+    sigma = 4/(2.5*np.sqrt(1+1/30)+0.7)
+    expected_sys_params = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
+    expected_rand_params = {'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
+    for key in expected_sys_params:
+        assert key in model.sys_parameters, f"Parameter {key} should be in sys_parameters"
+        assert np.isclose(model.sys_parameters[key], expected_sys_params[key]), f"Parameter {key} should be {expected_sys_params[key]}, got {model.sys_parameters[key]}"
+    for key in expected_rand_params:
+        assert key in model.rand_parameters, f"Parameter {key} should be in rand_parameters"
+        assert np.isclose(model.rand_parameters[key], expected_rand_params[key]), f"Parameter {key} should be {expected_rand_params[key]}, got {model.rand_parameters[key]}"
 
 def test_pdf_at_mean(simple_model):
-    mu = (simple_model.parameters['mu_x'], simple_model.parameters['mu_y'], simple_model.parameters['mu_z'])
+    mu = (simple_model.sys_parameters['mu_x'], simple_model.sys_parameters['mu_y'], simple_model.sys_parameters['mu_z'])
     pdf_value = simple_model.pdf(mu)
     expected_pdf = 1 / ((2 * np.pi) ** 1.5 *
-                        simple_model.parameters['sigma_x'] *
-                        simple_model.parameters['sigma_y'] *
-                        simple_model.parameters['sigma_z'])
+                        simple_model.sys_parameters['sigma_x'] *
+                        simple_model.sys_parameters['sigma_y'] *
+                        simple_model.sys_parameters['sigma_z'])
     assert np.isclose(pdf_value, expected_pdf), f"PDF at mean should be {expected_pdf}, got {pdf_value}"
 
 def test_pdf_symmetry(simple_model):
-    mu = (simple_model.parameters['mu_x'], simple_model.parameters['mu_y'], simple_model.parameters['mu_z'])
+    mu = (simple_model.sys_parameters['mu_x'], simple_model.sys_parameters['mu_y'], simple_model.sys_parameters['mu_z'])
     offset = 1.0
     point1 = (mu[0] + offset, mu[1], mu[2])
     point2 = (mu[0] - offset, mu[1], mu[2])
@@ -55,18 +71,18 @@ def test_sampled_points_pdf(simple_model):
 def test_bounded_integral(simple_model):
     # use integral separation in each dimension and compute analytically
     # assume mu = 0 for all dimensions for simplicity
-    Ix = 0.5 * (1 + erf(1 / (simple_model.parameters['sigma_x'] * np.sqrt(2)))) - \
-         0.5 * (1 + erf(-1 / (simple_model.parameters['sigma_x'] * np.sqrt(2))))
-    Iy = 0.5 * (1 + erf(1 / (simple_model.parameters['sigma_y'] * np.sqrt(2)))) - \
-         0.5 * (1 + erf(-1 / (simple_model.parameters['sigma_y'] * np.sqrt(2))))
-    Iz = 0.5 * (1 + erf(1 / (simple_model.parameters['sigma_z'] * np.sqrt(2)))) - \
-         0.5 * (1 + erf(-1 / (simple_model.parameters['sigma_z'] * np.sqrt(2))))
+    Ix = 0.5 * (1 + erf(1 / (simple_model.sys_parameters['sigma_x'] * np.sqrt(2)))) - \
+         0.5 * (1 + erf(-1 / (simple_model.sys_parameters['sigma_x'] * np.sqrt(2))))
+    Iy = 0.5 * (1 + erf(1 / (simple_model.sys_parameters['sigma_y'] * np.sqrt(2)))) - \
+         0.5 * (1 + erf(-1 / (simple_model.sys_parameters['sigma_y'] * np.sqrt(2))))
+    Iz = 0.5 * (1 + erf(1 / (simple_model.sys_parameters['sigma_z'] * np.sqrt(2)))) - \
+         0.5 * (1 + erf(-1 / (simple_model.sys_parameters['sigma_z'] * np.sqrt(2))))
     integral = Ix * Iy * Iz
     assert 0 < integral < 1, f"Integral over bounded region should be between 0 and 1, got {integral}"
     computed_integral = simple_model.boundedIntegral([-1, -1, -1], [1, 1, 1])
     assert np.isclose(integral, computed_integral), f"Computed integral should match expected value, got {computed_integral}"
-    simple_model.parameters['mu_x'] = 1
-    simple_model.parameters['mu_y'] = 1
-    simple_model.parameters['mu_z'] = 1
+    simple_model.sys_parameters['mu_x'] = 1
+    simple_model.sys_parameters['mu_y'] = 1
+    simple_model.sys_parameters['mu_z'] = 1
     with pytest.raises(NotImplementedError):
         simple_model.boundedIntegral([-1, -1, -1], [1, 1, 1])
