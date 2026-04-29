@@ -37,23 +37,31 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         - 'sigma_y': Standard deviation in y direction 
         - 'sigma_z': Standard deviation in z direction 
     
+    manual_input : dict (default: None)
+        A dictionary to allow manual input of the systematic and random parameters
+         of the Gaussian model. Same structure as sys_parameters and rand_parameters, but nested under 'sys_parameters' and 'rand_parameters' keys, respectively. 
+         If provided, this will override the default parameter settings based on marginSize and simulateRandom.
     """
 
-    def __init__(self, marginSize=5, n=500, simulateRandom=False):
+    def __init__(self, marginSize=5, n=500, simulateRandom=False, manual_input = None):
         super().__init__()
         self.name: str = "Gaussian3DUncertaintyModel"
         self.n_fractions = n
         self.marginSize = marginSize
-        if simulateRandom:
+        self.manual_input = manual_input
+        if simulateRandom and manual_input is None:
             #dose will be blurred, so we need to account for the number of fractions and random errors in the sigma calculation
             # we assume systematic and random sigma are the same
             sigma = marginSize/(2.5*np.sqrt(1+1/n)+0.7)
             self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
             self.rand_parameters = {'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
-        else:
+        elif manual_input is None:
             # if we do not consider random errors, we only account for systematic errors
             self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': marginSize/2.5, 'sigma_y': marginSize/2.5, 'sigma_z': marginSize/2.5}
             self.rand_parameters = None
+        else:
+            self.sys_parameters = manual_input['sys_parameters']
+            self.rand_parameters = manual_input['rand_parameters']
 
     def pdf(self, x):
         """
