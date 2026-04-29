@@ -3,7 +3,9 @@ import json
 
 from Probabilistic_Evaluation.data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
 from Probabilistic_Evaluation.data.clinicalGoals import * 
+from Probabilistic_Evaluation.utils import timed, Timer
 from opentps.core.data.images import CTImage
+
 
 class clinicalgoalsreader():
     """
@@ -77,7 +79,7 @@ class clinicalgoalsreader():
     def clinical_goals_list(self, newClinicalGoalsList: list):
         self._clinical_goals_list = newClinicalGoalsList
 
-
+    @timed
     def load_JSON_list(self, clinicalgoalpath: str):
         self.path = clinicalgoalpath
         self._clinical_goals_list = self.load_clinical_goals()

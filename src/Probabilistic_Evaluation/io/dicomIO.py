@@ -4,6 +4,8 @@ from opentps.core.data.images import DoseImage, CTImage
 from opentps.core.data import RTStruct
 import numpy as np
 
+from Probabilistic_Evaluation.utils import timed, Timer
+
 class DicomReader():
     """
     A class to read and process DICOM files including CT images, RTSTRUCT, and RTDOSE.
@@ -31,7 +33,7 @@ class DicomReader():
         self.spacing: tuple = None
         self.data = None
         self.CTImage = None
-
+    @timed
     def load_dicom_series(self,directory):
         """
         Load a DICOM series from the specified directory.

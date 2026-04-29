@@ -2,6 +2,7 @@ from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import Abstr
 from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
 from Probabilistic_Evaluation.data import DVH
+from Probabilistic_Evaluation.utils import timed, Timer
 import os
 
 import threading
@@ -74,7 +75,7 @@ class ProbabilisticEvaluator:
         else:
             self.nThreads = nThreads
 
-
+    @timed
     def evaluate(self)->pd.DataFrame:
         """
         Evaluate scenarios and compute clinical goal values and passing rates.

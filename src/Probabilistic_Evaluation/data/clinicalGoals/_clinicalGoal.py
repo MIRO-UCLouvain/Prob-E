@@ -1,5 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
+from Probabilistic_Evaluation.utils import timed, Timer
 
 
 class AbstractClinicalGoal(ABC):
@@ -135,7 +136,7 @@ class AbstractClinicalGoal(ABC):
             return value <= self._prescription
         else:
             return value >= self._prescription
-
+    @timed
     def compute(self, dvh, scenario_idx: int | None = None) -> None:
         """
         Compute the clinical goal value and success status based on the provided DVH.
