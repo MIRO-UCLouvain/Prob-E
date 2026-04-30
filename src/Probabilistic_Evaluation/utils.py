@@ -59,8 +59,21 @@ def linearInterpolator(x: float, x_array: np.ndarray, y_array: np.ndarray) -> fl
 
 
 
-#timer class and decorator for timing functions, with support for multi-threading and nested calls
 class Timer:
+    """
+    A singleton timer class for measuring function execution time with multi-threading support.
+
+    This class records timing information for functions, supporting nested calls and
+    multi-threaded execution. It maintains separate timing data for the main thread and
+    worker threads, and provides a formatted report of timing statistics.
+
+    Attributes
+    ----------
+    times : dict
+        Dictionary storing timing data keyed by function label.
+    thread_totals : dict
+        Dictionary storing total execution time per thread.
+    """
     _instance = None
     _local = threading.local()
     _lock = threading.Lock()
@@ -70,20 +83,60 @@ class Timer:
 
     @classmethod
     def get(cls):
+        """
+        Get the singleton Timer instance.
+
+        Returns
+        -------
+        Timer
+            The singleton Timer instance.
+        """
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
     @property
     def call_stack(self):
+        """
+        Get the call stack for the current thread.
+
+        Returns
+        -------
+        list
+            The call stack containing labels of nested function calls for the current thread.
+        """
         if not hasattr(self._local, "stack"):
             self._local.stack = []
         return self._local.stack
 
     def _is_main_thread(self):
+        """
+        Check if the current thread is the main thread.
+
+        Returns
+        -------
+        bool
+            True if the current thread is the main thread, False otherwise.
+        """
         return threading.current_thread().ident == self._main_thread_id
 
     def record(self, label, elapsed, depth):
+        """
+        Record the execution time of a function.
+
+        Parameters
+        ----------
+        label : str
+            The label identifying the function (usually "ClassName.method_name" or "function_name").
+        elapsed : float
+            The elapsed time in seconds.
+        depth : int
+            The depth of the call in the call stack (1 for top-level calls).
+
+        Returns
+        -------
+        None
+        """
         thread = threading.current_thread()
         is_main = self._is_main_thread()
 
@@ -98,6 +151,16 @@ class Timer:
                 self.thread_totals[thread.name] += elapsed
 
     def report(self):
+        """
+        Print a formatted timing report of all recorded function executions.
+
+        The report displays separate sections for main thread and worker thread statistics,
+        including total execution time, number of calls, and average times for worker threads.
+
+        Returns
+        -------
+        None
+        """
         with self._lock:
             main_entries = {k: v for k, v in self.times.items() if v["is_main"]}
             worker_entries = {}
@@ -166,12 +229,38 @@ class Timer:
         print("╚" + "═" * inner_width + "╝")
 
     def reset(self):
+        """
+        Reset all timing data.
+
+        Clears the times and thread_totals dictionaries to start fresh timing measurements.
+
+        Returns
+        -------
+        None
+        """
         with self._lock:
             self.times = {}
             self.thread_totals = {}
 
 
 def timed(func):
+    """
+    Decorator to measure and record the execution time of a function.
+
+    This decorator automatically times function calls and records the results in the global
+    Timer instance. It supports nested calls and multi-threaded execution. The timing data
+    can be accessed via Timer.get().report().
+
+    Parameters
+    ----------
+    func : callable
+        The function to be timed.
+
+    Returns
+    -------
+    callable
+        The wrapped function that records execution time.
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         label = f"{args[0].__class__.__name__}.{func.__name__}" if args else func.__name__
