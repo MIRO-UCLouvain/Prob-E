@@ -123,7 +123,7 @@ class DVH(object):
         """
         n_bins = 4096
         if isinstance(self.mask, np.ndarray):
-            #mask = self.mask.astype(bool)
+            mask = self.mask.astype(bool)
             dose_mask = self.dosemap[self.mask]
             bin_size = 100 / n_bins
             bin_edges = np.arange(0, self.maxDVH + 0.5 * bin_size, bin_size)  # np.arange is exclusive right limit
@@ -154,7 +154,7 @@ class DVH(object):
         """
         n_bins = 4096
         if isinstance(self.mask, np.ndarray):
-            #mask = self.mask.astype(bool)
+            mask = self.mask.astype(bool)
             dose_mask = self.dosemap[self.mask]
 
             bin_size = 100 / n_bins
