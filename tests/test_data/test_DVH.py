@@ -14,9 +14,9 @@ def sample_dvh():
 
 @pytest.fixture
 def easy_dvh():
-    arr = (np.arange(1000) + 1).reshape((10, 10, 10))
+    arr = np.arange(1, 1001).reshape((10, 10, 10)) / 10.0
     mask = np.ones((10, 10, 10))
-    return DVH(dosemap=arr, mask=mask, max_DVH=1010, spacing=(1.0, 1.0, 1.0))
+    return DVH(dosemap=arr, mask=mask, max_DVH=101, spacing=(1.0, 1.0, 1.0))
 
 
 def test_dvh_initialization(sample_dvh):
@@ -82,16 +82,16 @@ def test_dvh_dosemap_setter(sample_dvh):
 
 def test_easy_dvh_statistics(easy_dvh):
     dvh = easy_dvh
-    assert dvh.DMin == 1
-    assert dvh.DMax == 1000
-    assert dvh.DMean == 500.5
+    assert dvh.DMin == 0.1
+    assert dvh.DMax == 100.0
+    assert dvh.DMean == 50.05
 
 
 def test_easy_dvh_dvh_computation(easy_dvh):
     dvh = easy_dvh
     bin_dose = dvh.bin_dose
     dvh_values = dvh.dvh
-    dosemap = (np.arange(1000) + 1).reshape((10, 10, 10))
+    dosemap = np.arange(1, 1001).reshape((10, 10, 10)) / 10.0
     # Check that the DVH values are correctly computed
     for i in range(len(bin_dose) - 1):
         dose_threshold = bin_dose[i]
@@ -102,10 +102,10 @@ def test_easy_dvh_dvh_computation(easy_dvh):
 
 
 @pytest.mark.parametrize("dose,expected_vx", [
-    (100, 90.1),
-    (500, 50.0),
-    (900, 10.0),
-    (1000, 0.0),
+    (10, 90.1),
+    (50, 50.0),
+    (90, 10.0),
+    (100, 0.0),
 ])
 def test_easy_dvh_Vx(easy_dvh, dose, expected_vx):
     dvh = easy_dvh
@@ -115,10 +115,10 @@ def test_easy_dvh_Vx(easy_dvh, dose, expected_vx):
 
 
 @pytest.mark.parametrize("volume,expected_dx", [
-    (1,1),
-    (0.5,500),
-    (0.1,900),
-    (0.001,1000),
+    (1,0.1),
+    (0.5,50),
+    (0.1,90),
+    (0.001,100),
 ])
 def test_easy_dvh_Dx(easy_dvh, volume, expected_dx):
     dvh = easy_dvh
@@ -127,10 +127,10 @@ def test_easy_dvh_Dx(easy_dvh, volume, expected_dx):
     assert 0.0 <= value <= 1000.0
 
 @pytest.mark.parametrize("dose,expected_vcc", [
-    (100, 0.901),
-    (500, 0.500),
-    (900, 0.099),
-    (1000, 0),
+    (10, 0.901),
+    (50, 0.500),
+    (90, 0.099),
+    (100, 0),
 ])
 def test_easy_dvh_Vcc(easy_dvh, dose, expected_vcc):
     dvh = easy_dvh
@@ -139,10 +139,10 @@ def test_easy_dvh_Vcc(easy_dvh, dose, expected_vcc):
     assert 0.0 <= value <= 1000.0
 
 @pytest.mark.parametrize("volume,expected_dcc", [
-    (1,1),
-    (0.5,500),
-    (0.1,900),
-    (0.001,1000),
+    (1,0.1),
+    (0.5,50),
+    (0.1,90),
+    (0.001,100),
 ])
 def test_easy_dvh_Dcc(easy_dvh, volume, expected_dcc):
     dvh = easy_dvh

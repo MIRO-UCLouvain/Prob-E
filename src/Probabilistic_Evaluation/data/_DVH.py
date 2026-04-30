@@ -156,9 +156,9 @@ class DVH(object):
         if isinstance(self.mask, np.ndarray):
             mask = self.mask.astype(bool)
             dose_mask = self.dosemap[mask]
-
-            bin_size = self.maxDVH / n_bins
-            bin_edges = np.arange(0, self.maxDVH + 0.5 * bin_size, bin_size)
+            
+            bin_size = 101 / n_bins
+            bin_edges = np.arange(0, 101 + 0.5 * bin_size, bin_size)
             bin_edges[-1] += dose_mask.max()  # Ensure the max dose is included in the last bin
 
             bin_idx = np.floor(dose_mask / bin_size).astype(np.int32)
