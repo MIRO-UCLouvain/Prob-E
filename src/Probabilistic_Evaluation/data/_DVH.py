@@ -1,6 +1,6 @@
 import numpy as np
 from Probabilistic_Evaluation.utils import linearInterpolator
-
+from Probabilistic_Evaluation.utils import timed, Timer
 
 class DVH(object):
     """
@@ -56,7 +56,7 @@ class DVH(object):
         self._DMax = None
         self._DMean = None
         self._spacing = spacing
-        self.computeDVH()
+        self.computeDVH_fast()
 
     @property
     def dosemap(self) -> np.ndarray:
@@ -65,7 +65,7 @@ class DVH(object):
     @dosemap.setter
     def dosemap(self, newDosemap):
         self._dosemap = newDosemap
-        self.computeDVH()
+        self.computeDVH_fast()
 
     @property
     def mask(self) -> np.ndarray:
@@ -116,17 +116,18 @@ class DVH(object):
             raise ValueError("All spacing values must be positive.")
         self._spacing = newSpacing
 
+    @timed
     def computeDVH(self):
         """
         Compute Dose-Volume Histogram (DVH) for a given mask.
         """
         n_bins = 4096
         if isinstance(self.mask, np.ndarray):
-            mask = self.mask.astype(bool)
-            dose_mask = self.dosemap[mask]
-            bin_size = self.maxDVH / n_bins
+            #mask = self.mask.astype(bool)
+            dose_mask = self.dosemap[self.mask]
+            bin_size = 100 / n_bins
             bin_edges = np.arange(0, self.maxDVH + 0.5 * bin_size, bin_size)  # np.arange is exclusive right limit
-            bin_edges[-1] += dose_mask.max()  # Ensure the max dose is included in the last bin
+            #bin_edges[-1] += dose_mask.max()  # Ensure the max dose is included in the last bin
             hist, _ = np.histogram(dose_mask, bins=bin_edges)
             hist = np.flip(hist, 0)  # Flip to get descending order
             dvh = np.cumsum(hist)  # Cumulative sum
@@ -139,6 +140,39 @@ class DVH(object):
             DMax = self.DMax
             DMin = self.DMin
             DMean = self.DMean
+
+            del self._dosemap
+            self._dosemap = None  # free memory
+    
+    @timed
+    def computeDVH_fast(self):
+        """
+        Compute Dose-Volume Histogram (DVH) using a faster CPU-only path.
+
+        The output is kept compatible with computeDVH(): same binning logic,
+        same DVH normalization, and same cached summary statistics.
+        """
+        n_bins = 4096
+        if isinstance(self.mask, np.ndarray):
+            #mask = self.mask.astype(bool)
+            dose_mask = self.dosemap[self.mask]
+
+            bin_size = 100 / n_bins
+            bin_edges = np.arange(0, self.maxDVH + 0.5 * bin_size, bin_size)
+            #bin_edges[-1] += dose_mask.max()
+
+            bin_idx = np.floor(dose_mask / bin_size).astype(np.int32)
+            np.clip(bin_idx, 0, n_bins - 1, out=bin_idx)
+            hist = np.bincount(bin_idx, minlength=n_bins)
+
+            dvh = np.cumsum(hist[::-1])[::-1]
+            dvh = dvh / np.sum(hist) * 100.0
+
+            self._bin_dose = (bin_edges[:-1] + bin_edges[1:]) / 2.0
+            self._dvh = dvh
+            self._DMax = np.max(dose_mask)
+            self._DMin = np.min(dose_mask)
+            self._DMean = np.mean(dose_mask)
 
             del self._dosemap
             self._dosemap = None  # free memory
