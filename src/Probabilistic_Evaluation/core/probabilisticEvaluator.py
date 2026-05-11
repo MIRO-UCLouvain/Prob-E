@@ -40,13 +40,10 @@ class ProbabilisticEvaluator:
     nominal_index : int or None
         The index of the nominal scenario (displacement close to [0,0,0]),
         or None if no nominal scenario is found.
+    blurred_dose : np.ndarray or None
+        The blurred dose image used for evaluation when simulating fractionation, or None if not computed.
     nThreads : int
         The number of threads to use for parallel evaluation, determined based on the number of CPU cores if not specified.
-
-    Methods
-    -------
-    evaluate() -> pd.DataFrame
-        Evaluate scenarios and compute clinical goal values and passing rates, returning a summary table as a DataFrame.
     """
 
     def __init__(self, PatientData:PatientData, sampler:AbstractsamplingMethod,**kwargs):
@@ -61,6 +58,9 @@ class ProbabilisticEvaluator:
 
         self.VWMin = None
         self.VWMax = None
+
+        self.blurred_dose = None
+
         self.nominal_index = [i for i, s in enumerate(self.scenarios) if np.allclose(s.displacement, [0, 0, 0])][
             0] if any(np.allclose(s.displacement, [0, 0, 0]) for s in self.scenarios) else None
 
@@ -86,8 +86,8 @@ class ProbabilisticEvaluator:
             A DataFrame containing clinical goals, nominal values, passing rates, and cumulative passing rates if computed
         """
         if self.sampler.UncertaintyModel.rand_parameters is not None:
-            dose_image = self.blur_dose()
-            self.patientData.doseImage = dose_image
+            blurred_dose = self.blur_dose()
+            self.blurred_dose = blurred_dose
             print("Updated patient dose image with blurred dose")
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
@@ -128,8 +128,15 @@ class ProbabilisticEvaluator:
         None
 
         """
-        
-        scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
+
+        # We use blurred dose because of fractionation
+        if self.blurred_dose is not None:
+            scenario.compute_shifted_image(self.blurred_dose, scenario.displacement)
+
+        # Fractionation is not considered, we use the original dose image for evaluation
+        else:
+            scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
+
         dvh_dict = {}
         for mask in self.patientData.maskDict.keys():
             dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
@@ -140,6 +147,45 @@ class ProbabilisticEvaluator:
         if self.computeVWMax:
             self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
         scenario.delete_doseImage()
+
+
+    def computeNominalValues(self):
+        """
+        Compute nominal values for each clinical goal based on the scenario with displacement closest to [0, 0, 0].
+        If fractionation is simulated, the nominal values are computed on a non-blurred dose since it represents
+        a 0 setup error and 0 random error at each fraction.
+
+        Returns
+        -------
+        value_list : list
+            A list of nominal values corresponding to each clinical goal, or None if no nominal scenario is found.
+        success_list : list
+            A list of boolean values indicating whether each clinical goal is achieved in the nominal scenario, or
+            None if no nominal scenario is found.
+        """
+        value_list = []
+        success_list = []
+
+        # We need to recompute the goals for a non_blured_dose
+        if self.blurred_dose is not None:
+            nominal_dose = self.patientData.doseImage
+            dvh_dict = {}
+            for mask in self.patientData.maskDict.keys():
+                dvh_dict[mask] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
+            for goal in self.patientData.clinicalGoalsList:
+                value, success = goal.compute(dvh_dict[goal.maskName])
+                value_list.append(value)
+                success_list.append(success)
+
+        # We can use the nominal index to directly get the values from the goal's valueList
+        else:
+            for goal in self.patientData.clinicalGoalsList:
+                value = goal.valueList[self.nominal_index] if self.nominal_index is not None and len(goal.valueList) > self.nominal_index else None
+                value_list.append(value)
+                success = goal.successList[self.nominal_index] if self.nominal_index is not None else None
+                success_list.append(success)
+
+        return value_list, success_list
 
     def passingRates(self)->list:
         """
@@ -213,10 +259,10 @@ class ProbabilisticEvaluator:
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing clinical goals, nominal values, passing rates, and cumulative passing rates if computed.
+            A DataFrame containing clinical goals, nominal values, nominal success, passing rates, and cumulative passing rates if computed.
         """
 
-        headers = ["Mask Name", "Clinical Goal", "Nominal value", "Passing Rate"]
+        headers = ["Mask Name", "Clinical Goal", "Nominal Value", "Nominal Success", "Passing Rate"]
         if cumulativePassingRates is not None:
             headers.append("Cumulative Passing Rate")
         if cumulativeRelativePassingRates is not None:
@@ -224,12 +270,15 @@ class ProbabilisticEvaluator:
         headers.append("Success Array")
         headers.append("Probability Array")
 
+        nominal_value,nominal_success = self.computeNominalValues()
+
         rows = []
         for i, goal in enumerate(self.patientData.clinicalGoalsList):
             row = {
                 "Mask Name": goal.maskName,
                 "Clinical Goal": str(goal),
-                "Nominal value": "{:.3f}".format((goal.valueList[self.nominal_index]) if self.nominal_index is not None and len(goal.valueList) > self.nominal_index else "N/A"),
+                "Nominal Value": "{:.3f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
+                "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
                 "Passing Rate": passingRates[i]
             }
 
@@ -337,14 +386,12 @@ class ProbabilisticEvaluator:
             ] if c in table.columns
         ]
 
-        goals = self.patientData.clinicalGoalsList
-        nominal_idx = table.columns.get_loc("Nominal value")
+        nominal_idx = table.columns.get_loc("Nominal Value")
 
         def nominal_color(row):
             styles = [""] * len(row)
-            goal = goals[row.name]
 
-            success = goal.successList[self.nominal_index]
+            success = row["Nominal Success"] if "Nominal Success" in row else None
 
             if success:
                 styles[nominal_idx] = "background-color:#8ef58e"

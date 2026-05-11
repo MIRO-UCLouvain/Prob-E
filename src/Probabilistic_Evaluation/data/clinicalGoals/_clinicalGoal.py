@@ -137,10 +137,10 @@ class AbstractClinicalGoal(ABC):
         else:
             return value >= self._prescription
     @timed
-    def compute(self, dvh, scenario_idx: int | None = None) -> None:
+    def compute(self, dvh, scenario_idx: int | None = None) -> tuple[float, bool]:
         """
         Compute the clinical goal value and success status based on the provided DVH.
-
+        The computed value and success status can be stored in the respective lists if a scenario index is provided.
         Parameters
         ----------
         dvh : DVH
@@ -150,7 +150,8 @@ class AbstractClinicalGoal(ABC):
 
         Returns
         -------
-        None
+        tuple[float, bool]
+            A tuple containing the computed value of the clinical goal and a boolean indicating if the goal is achieved.
         """
         value = self.compute_value(dvh)
         success = self.compute_success(value)
@@ -158,6 +159,5 @@ class AbstractClinicalGoal(ABC):
         if scenario_idx is not None:
             self.valueList[scenario_idx] = value
             self.successList[scenario_idx] = success
-        else:
-            self.valueList = np.append(self.valueList, value)
-            self.successList = np.append(self.successList, success)
+
+        return value, success
