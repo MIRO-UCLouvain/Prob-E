@@ -86,8 +86,7 @@ class ProbabilisticEvaluator:
             A DataFrame containing clinical goals, nominal values, passing rates, and cumulative passing rates if computed
         """
         if self.sampler.UncertaintyModel.rand_parameters is not None:
-            blurred_dose = self.blur_dose()
-            self.blurred_dose = blurred_dose
+            self.blurred_dose = self.blur_dose()
             print("Updated patient dose image with blurred dose")
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
