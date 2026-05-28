@@ -6,16 +6,16 @@ build-backend = "setuptools.build_meta"
 name = "rt-probabilistic-evaluation"
 version = "0.1.0"
 description = "A package for probabilistic evaluation in radiation therapy"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 authors = [
   { name = "Matijs Geerts" },
   { name = "Romain Schyns" },
   { name = "Eliot Peeters" }
 ]
 dependencies = [
-    "numpy>=2.3.2,<3.0",
+    "numpy>=1.3.2,<3.0",
     "scipy>=1.11,<2.0",
-    "opentps>=3.0.0",
+    "opentps>=2.0.0",
     "pandas>=2.0.3,<3.0",
     "matplotlib>=3.7.1,<4.0",
 ]
