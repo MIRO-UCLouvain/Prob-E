@@ -19,6 +19,7 @@ def shift_dose_image(doseImage, shift):
     shifted_dose : np.ndarray
         The shifted dose image.
     """
+    shift = (int(round(shift[0])), int(round(shift[1])), int(round(shift[2])))
     if len(shift) != doseImage.ndim:
         raise ValueError("Shift dimensions must match dose image dimensions.")
     shifted_dose = np.roll(doseImage, shift=shift, axis=(0, 1, 2))
