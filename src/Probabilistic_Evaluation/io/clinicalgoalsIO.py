@@ -98,9 +98,13 @@ class clinicalgoalsreader():
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
-        maskName=goal_dict["ROI"]
-        mask = self.maskDict[maskName].getBinaryMask(origin=self._ct.origin, gridSize=self._ct.gridSize, spacing=self._ct.spacing).imageArray
-        self.resampledMasks[maskName] = mask
+        if self.resampledMasks == None:
+            maskName=goal_dict["ROI"]
+            mask = self.maskDict[maskName].getBinaryMask(origin=self._ct.origin, gridSize=self._ct.gridSize, spacing=self._ct.spacing).imageArray
+            self.resampledMasks[maskName] = mask
+        else: 
+            maskName = goal_dict["ROI"]
+            mask = self.resampledMasks[maskName]
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority",0)
