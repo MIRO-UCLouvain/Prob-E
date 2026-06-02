@@ -244,7 +244,7 @@ class DVH(object):
         if x < 0:
             raise ValueError("Absolute volume must be a non-negative value.")
 
-        total_volume_cc = np.sum(self.mask.astype(bool)) * np.prod(self.spacing) / 1000.0  # convert mm^3 to cc
+        total_volume_cc = np.sum(self.mask) * np.prod(self.spacing) / 1000.0  # convert mm^3 to cc
         if x > total_volume_cc:
             raise ValueError("Absolute volume exceeds total volume of the structure.")
 
@@ -275,6 +275,6 @@ class DVH(object):
             raise ValueError("Dose must be a non-negative value.")
         volume_percentage = linearInterpolator(x, self.bin_dose, self.dvh)
 
-        total_volume_cc = (np.sum(self.mask.astype(bool)) * np.prod(self.spacing) / 1000.0)
+        total_volume_cc = (np.sum(self.mask) * np.prod(self.spacing) / 1000.0)
 
         return (volume_percentage / 100.0) * total_volume_cc
