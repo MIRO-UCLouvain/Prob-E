@@ -99,7 +99,7 @@ class DVH(object):
     def DMean(self) -> float:
         if self._DMean is None:
             
-            self._DMean = np.mean(self.dosemap[self.mask>0]*self.mask)
+            self._DMean = np.mean(self.dosemap[self.mask>0]*self.mask[self.mask>0])
         return self._DMean
 
     @property
@@ -125,15 +125,13 @@ class DVH(object):
         """
         n_bins = 4096
         if isinstance(self.mask, np.ndarray):
-            bool_mask = self.mask>0
-             
             bin_size = 101 / n_bins
             bin_edges = np.arange(0, 101 + 0.5 * bin_size, bin_size)
-            bin_edges[-1] += self.dosemap[bool_mask].max()  # Ensure the max dose is included in the last bin
+            bin_edges[-1] += self.dosemap[self.mask>0].max()  # Ensure the max dose is included in the last bin
 
-            bin_idx = np.floor( self.dosemap[bool_mask]/ bin_size).astype(np.int32)
+            bin_idx = np.floor( self.dosemap[self.mask>0]/ bin_size).astype(np.int32)
             np.clip(bin_idx, 0, n_bins - 1, out=bin_idx)
-            hist = np.bincount(bin_idx.flatten(), minlength=n_bins, weights=self.mask.flatten())
+            hist = np.bincount(bin_idx, minlength=n_bins, weights=self.mask[self.mask>0])
 
             dvh = np.cumsum(hist[::-1])[::-1]
             dvh = dvh / np.sum(hist) * 100.0
