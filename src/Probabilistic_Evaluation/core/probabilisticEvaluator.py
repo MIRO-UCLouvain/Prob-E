@@ -87,6 +87,7 @@ class ProbabilisticEvaluator:
         """
         if self.sampler.UncertaintyModel.rand_parameters is not None:
             self.blurred_dose = self.blur_dose()
+            self.displayblurandnominal(self.patientData.doseImage, self.blurred_dose)
             print("Updated patient dose image with blurred dose")
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
@@ -501,3 +502,108 @@ class ProbabilisticEvaluator:
             plt.colorbar(label='Dose Difference')
             plt.title('VWMax - VWMin Dose Distribution (Slice {0})'.format(z_idx))
             plt.show()
+    
+    def displayblurandnominal(self, nominal_dose, blurred_dose, z_idx=None):
+        """
+        Display the nominal and blurred dose images for comparison.
+
+        Parameters
+        ----------
+        nominal_dose : np.ndarray
+            A 3D array representing the nominal dose map.
+        blurred_dose : np.ndarray
+            A 3D array representing the blurred dose map.
+        z_idx : int, optional
+            The index of the z-slice to display. If None, the middle slice will be displayed. Default is None.
+
+        Returns
+        -------
+        None
+        """
+        if blurred_dose is None:
+            raise ValueError("blurred_dose cannot be None")
+
+        if nominal_dose.shape != blurred_dose.shape:
+            raise ValueError("nominal_dose and blurred_dose must have the same shape")
+
+        z_max = nominal_dose.shape[2]
+        if z_idx is None:
+            z_idx = z_max // 2
+        z_idx = int(np.clip(z_idx, 0, z_max - 1))
+
+        import matplotlib.pyplot as plt
+        from matplotlib.widgets import Slider
+        from matplotlib.lines import Line2D
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+        plt.subplots_adjust(bottom=0.18)
+
+        im_nominal = axes[0].imshow(nominal_dose[:, :, z_idx], cmap='jet')
+        fig.colorbar(im_nominal, ax=axes[0], label='Dose')
+        axes[0].set_title('Nominal Dose Distribution (Slice {0})'.format(z_idx))
+
+        im_blurred = axes[1].imshow(blurred_dose[:, :, z_idx], cmap='jet')
+        fig.colorbar(im_blurred, ax=axes[1], label='Dose')
+        axes[1].set_title('Blurred Dose Distribution (Slice {0})'.format(z_idx))
+
+        contour_names = ["GTV", "PTV_3mm", "Macula"]
+        contour_colors = {
+            "GTV": "cyan",
+            "PTV_3mm": "magenta",
+            "Macula": "lime"
+        }
+
+        available_contours = [
+            name for name in contour_names if name in self.patientData.maskDict
+        ]
+
+        contour_sets = [[], []]
+
+        def draw_contours(ax, slice_idx, axis_idx):
+            for contour_set in contour_sets[axis_idx]:
+                for collection in contour_set.collections:
+                    collection.remove()
+
+            contour_sets[axis_idx] = []
+            for name in available_contours:
+                contour_set = ax.contour(
+                    self.patientData.maskDict[name][:, :, slice_idx],
+                    levels=[0.5],
+                    colors=contour_colors[name],
+                    linewidths=1.0,
+                )
+                contour_sets[axis_idx].append(contour_set)
+
+        draw_contours(axes[0], z_idx, axis_idx=0)
+        draw_contours(axes[1], z_idx, axis_idx=1)
+
+        if available_contours:
+            legend_handles = [
+                Line2D([0], [0], color=contour_colors[name], lw=2, label=name)
+                for name in available_contours
+            ]
+            for ax in axes:
+                ax.legend(handles=legend_handles, loc='upper right')
+
+        slider_ax = fig.add_axes((0.15, 0.07, 0.7, 0.04))
+        z_slider = Slider(
+            ax=slider_ax,
+            label='Z Slice',
+            valmin=0,
+            valmax=z_max - 1,
+            valinit=z_idx,
+            valstep=1,
+        )
+
+        def update(_):
+            current_z = int(z_slider.val)
+            im_nominal.set_data(nominal_dose[:, :, current_z])
+            im_blurred.set_data(blurred_dose[:, :, current_z])
+            draw_contours(axes[0], current_z, axis_idx=0)
+            draw_contours(axes[1], current_z, axis_idx=1)
+            axes[0].set_title('Nominal Dose Distribution (Slice {0})'.format(current_z))
+            axes[1].set_title('Blurred Dose Distribution (Slice {0})'.format(current_z))
+            fig.canvas.draw_idle()
+
+        z_slider.on_changed(update)
+        plt.show()
