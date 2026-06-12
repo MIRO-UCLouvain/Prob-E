@@ -93,12 +93,12 @@ class clinicalgoalsreader():
             goals_list.append(clinical_goal_obj)
         if all(hasattr(goal, "priority") for goal in goals_list):
             goals_list.sort(key=lambda x: x.priority)
-           
+        
         return goals_list
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
-        if self.resampledMasks == None:
+        if goal_dict["ROI"] not in self.resampledMasks.keys():
             maskName=goal_dict["ROI"]
             mask = self.maskDict[maskName].getBinaryMask(origin=self._ct.origin, gridSize=self._ct.gridSize, spacing=self._ct.spacing).imageArray
             self.resampledMasks[maskName] = mask
