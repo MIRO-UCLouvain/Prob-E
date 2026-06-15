@@ -505,7 +505,8 @@ class ProbabilisticEvaluator:
     
     def displayblurandnominal(self, nominal_dose, blurred_dose, z_idx=None):
         """
-        Display the nominal and blurred dose images for comparison.
+        Display the nominal and blurred dose images with CT background,
+        requested contours, four synchronized dose profiles, and a z-axis slider.
 
         Parameters
         ----------
@@ -514,7 +515,7 @@ class ProbabilisticEvaluator:
         blurred_dose : np.ndarray
             A 3D array representing the blurred dose map.
         z_idx : int, optional
-            The index of the z-slice to display. If None, the middle slice will be displayed. Default is None.
+            The index of the z-slice to display. If None, the middle slice is displayed.
 
         Returns
         -------
@@ -532,58 +533,166 @@ class ProbabilisticEvaluator:
         z_idx = int(np.clip(z_idx, 0, z_max - 1))
 
         import matplotlib.pyplot as plt
+        import matplotlib.colors as colors
         from matplotlib.widgets import Slider
         from matplotlib.lines import Line2D
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-        plt.subplots_adjust(bottom=0.18)
+        dose_vmin = float(min(np.min(nominal_dose), np.min(blurred_dose)))
+        dose_vmax = float(max(np.max(nominal_dose), np.max(blurred_dose)))
+        dose_norm = colors.PowerNorm(gamma=4.0, vmin=dose_vmin, vmax=dose_vmax)
+        profile_ymin = float(np.min([np.min(nominal_dose), np.min(blurred_dose)]))
+        profile_ymax = float(np.max([np.max(nominal_dose), np.max(blurred_dose)]))
 
-        im_nominal = axes[0].imshow(nominal_dose[:, :, z_idx], cmap='jet')
-        fig.colorbar(im_nominal, ax=axes[0], label='Dose')
-        axes[0].set_title('Nominal Dose Distribution (Slice {0})'.format(z_idx))
+        display_xmin = 150
+        display_xmax = 400
+        display_ymin = 150
+        display_ymax = 400
 
-        im_blurred = axes[1].imshow(blurred_dose[:, :, z_idx], cmap='jet')
-        fig.colorbar(im_blurred, ax=axes[1], label='Dose')
-        axes[1].set_title('Blurred Dose Distribution (Slice {0})'.format(z_idx))
+        fig, axes = plt.subplots(3, 2, figsize=(16, 14))
+        plt.subplots_adjust(bottom=0.12, hspace=0.4, wspace=0.25)
 
-        contour_names = ["GTV", "PTV_3mm", "Macula"]
+        image_axes = [axes[0, 0], axes[0, 1]]
+        profile_axes = [axes[1, 0], axes[1, 1], axes[2, 0], axes[2, 1]]
+
+        contour_names = ["PTV", "PTV_3mm", "GTV", "Macula"]
         contour_colors = {
-            "GTV": "cyan",
+            "PTV": "orange",
             "PTV_3mm": "magenta",
-            "Macula": "lime"
+            "GTV": "cyan",
+            "Macula": "lime",
         }
 
-        available_contours = [
-            name for name in contour_names if name in self.patientData.maskDict
+        contour_aliases = {
+            "PTV": ["PTV"],
+            "PTV_3mm": ["PTV_3mm"],
+            "GTV": ["GTV"],
+            "Macula": ["Macula", "Macula_R"],
+        }
+
+        available_contours = []
+        for display_name in contour_names:
+            aliases = [alias.lower() for alias in contour_aliases.get(display_name, [display_name])]
+            matching_keys = [
+                key for key in self.patientData.maskDict.keys()
+                if key.lower() in aliases
+            ]
+
+            if display_name == "Macula" and not matching_keys:
+                matching_keys = [
+                    key for key in self.patientData.maskDict.keys()
+                    if "macula" in key.lower()
+                ]
+
+            for mask_name in matching_keys:
+                available_contours.append((display_name, mask_name))
+
+        legend_handles = [
+            Line2D([0], [0], color=contour_colors[display_name], lw=2, label=display_name)
+            for display_name, _ in available_contours
         ]
 
-        contour_sets = [[], []]
+        colorbar_nominal = None
+        colorbar_blurred = None
 
-        def draw_contours(ax, slice_idx, axis_idx):
-            for contour_set in contour_sets[axis_idx]:
-                for collection in contour_set.collections:
-                    collection.remove()
+        x_profile_fixed_y = [
+            int(np.clip(228, 0, nominal_dose.shape[1] - 1)),
+            int(np.clip(236, 0, nominal_dose.shape[1] - 1)),
+        ]
+        y_profile_fixed_x = [
+            int(np.clip(223, 0, nominal_dose.shape[0] - 1)),
+            int(np.clip(236, 0, nominal_dose.shape[0] - 1)),
+        ]
 
-            contour_sets[axis_idx] = []
-            for name in available_contours:
-                contour_set = ax.contour(
-                    self.patientData.maskDict[name][:, :, slice_idx],
-                    levels=[0.5],
-                    colors=contour_colors[name],
-                    linewidths=1.0,
-                )
-                contour_sets[axis_idx].append(contour_set)
+        def redraw_slice(slice_idx):
+            nonlocal colorbar_nominal, colorbar_blurred
 
-        draw_contours(axes[0], z_idx, axis_idx=0)
-        draw_contours(axes[1], z_idx, axis_idx=1)
+            if colorbar_nominal is not None:
+                colorbar_nominal.remove()
+                colorbar_nominal = None
+            if colorbar_blurred is not None:
+                colorbar_blurred.remove()
+                colorbar_blurred = None
 
-        if available_contours:
-            legend_handles = [
-                Line2D([0], [0], color=contour_colors[name], lw=2, label=name)
-                for name in available_contours
+            for axis in axes.flat:
+                axis.clear()
+
+            ct_slice = self.patientData.ctImage[:, :, slice_idx]
+
+            nominal_image = image_axes[0].imshow(ct_slice, cmap='gray', zorder=0)
+            nominal_dose_image = image_axes[0].imshow(nominal_dose[:, :, slice_idx], cmap='jet', norm=dose_norm, alpha=0.5, zorder=1)
+            image_axes[0].set_title('Nominal Dose Distribution (Slice {0})'.format(slice_idx))
+            image_axes[0].set_xlabel('x')
+            image_axes[0].set_ylabel('y')
+            image_axes[0].set_xlim(display_xmin, display_xmax)
+            image_axes[0].set_ylim(display_ymax, display_ymin)
+            for fixed_y in x_profile_fixed_y:
+                image_axes[0].axhline(fixed_y, color='white', linestyle='--', linewidth=1.0, alpha=0.9)
+            for fixed_x in y_profile_fixed_x:
+                image_axes[0].axvline(fixed_x, color='white', linestyle=':', linewidth=1.0, alpha=0.9)
+
+            blurred_image = image_axes[1].imshow(ct_slice, cmap='gray', zorder=0)
+            blurred_dose_image = image_axes[1].imshow(blurred_dose[:, :, slice_idx], cmap='jet', norm=dose_norm, alpha=0.5, zorder=1)
+            image_axes[1].set_title('Blurred Dose Distribution (Slice {0})'.format(slice_idx))
+            image_axes[1].set_xlabel('x')
+            image_axes[1].set_ylabel('y')
+            image_axes[1].set_xlim(display_xmin, display_xmax)
+            image_axes[1].set_ylim(display_ymax, display_ymin)
+            for fixed_y in x_profile_fixed_y:
+                image_axes[1].axhline(fixed_y, color='white', linestyle='--', linewidth=1.0, alpha=0.9)
+            for fixed_x in y_profile_fixed_x:
+                image_axes[1].axvline(fixed_x, color='white', linestyle=':', linewidth=1.0, alpha=0.9)
+
+            for axis in image_axes:
+                for display_name, mask_name in available_contours:
+                    axis.contour(
+                        self.patientData.maskDict[mask_name][:, :, slice_idx],
+                        levels=[0.5],
+                        colors=contour_colors[display_name],
+                        linewidths=1.0,
+                        zorder=2,
+                    )
+
+                if available_contours:
+                    axis.legend(handles=legend_handles, loc='upper right')
+
+            colorbar_nominal = fig.colorbar(nominal_dose_image, ax=image_axes[0], label='Dose')
+            colorbar_blurred = fig.colorbar(blurred_dose_image, ax=image_axes[1], label='Dose')
+
+            profile_specs = [
+                (profile_axes[0], "x", x_profile_fixed_y[0], f"Dose profile: y={x_profile_fixed_y[0]}, z={slice_idx}"),
+                (profile_axes[1], "x", x_profile_fixed_y[1], f"Dose profile: y={x_profile_fixed_y[1]}, z={slice_idx}"),
+                (profile_axes[2], "y", y_profile_fixed_x[0], f"Dose profile: x={y_profile_fixed_x[0]}, z={slice_idx}"),
+                (profile_axes[3], "y", y_profile_fixed_x[1], f"Dose profile: x={y_profile_fixed_x[1]}, z={slice_idx}"),
             ]
-            for ax in axes:
-                ax.legend(handles=legend_handles, loc='upper right')
+
+            for axis, direction, fixed_index, title in profile_specs:
+                if direction == "x":
+                    x_values = np.arange(nominal_dose.shape[0])
+                    nominal_curve = nominal_dose[:, fixed_index, slice_idx]
+                    blurred_curve = blurred_dose[:, fixed_index, slice_idx]
+                    axis.set_xlabel("x")
+                else:
+                    x_values = np.arange(nominal_dose.shape[1])
+                    nominal_curve = nominal_dose[fixed_index, :, slice_idx]
+                    blurred_curve = blurred_dose[fixed_index, :, slice_idx]
+                    axis.set_xlabel("y")
+
+                axis.plot(x_values, nominal_curve, color="tab:blue", label="Nominal")
+                axis.plot(x_values, blurred_curve, color="tab:red", linestyle="--", label="Blurred")
+                if direction == "x":
+                    for fixed_ref in x_profile_fixed_y:
+                        axis.axvline(fixed_ref, color='0.5', linestyle=':', linewidth=0.9, alpha=0.7)
+                else:
+                    for fixed_ref in y_profile_fixed_x:
+                        axis.axvline(fixed_ref, color='0.5', linestyle=':', linewidth=0.9, alpha=0.7)
+                axis.set_title(title)
+                axis.set_ylabel("Dose")
+                axis.grid(True, alpha=0.2)
+                axis.legend(loc='best')
+                axis.set_xlim(display_xmin, display_xmax)
+                axis.set_ylim(profile_ymin, profile_ymax)
+
+        redraw_slice(z_idx)
 
         slider_ax = fig.add_axes((0.15, 0.07, 0.7, 0.04))
         z_slider = Slider(
@@ -597,13 +706,11 @@ class ProbabilisticEvaluator:
 
         def update(_):
             current_z = int(z_slider.val)
-            im_nominal.set_data(nominal_dose[:, :, current_z])
-            im_blurred.set_data(blurred_dose[:, :, current_z])
-            draw_contours(axes[0], current_z, axis_idx=0)
-            draw_contours(axes[1], current_z, axis_idx=1)
-            axes[0].set_title('Nominal Dose Distribution (Slice {0})'.format(current_z))
-            axes[1].set_title('Blurred Dose Distribution (Slice {0})'.format(current_z))
+            redraw_slice(current_z)
             fig.canvas.draw_idle()
 
         z_slider.on_changed(update)
         plt.show()
+
+
+    
