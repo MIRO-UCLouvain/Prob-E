@@ -279,7 +279,8 @@ class ProbabilisticEvaluator:
                 "Clinical Goal": str(goal),
                 "Nominal Value": "{:.3f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
                 "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
-                "Passing Rate": passingRates[i]
+                "Passing Rate": passingRates[i],
+                "Probabilistic Objective": goal.probabilistic
             }
 
             if cumulativePassingRates is not None:
@@ -460,6 +461,55 @@ class ProbabilisticEvaluator:
         if not save_success_array:
             table = table.drop(columns=["Success Array", "Probability Array"])
         table.to_csv(filepath, index=False)
+
+    def saveTableToJSON(self, table: pd.DataFrame, filepath: str = "passing_rate_table.json"):
+        """
+        Save the passing rate results as a JSON file with top-level metadata.
+
+        Parameters
+        ----------
+        table : pd.DataFrame
+            A DataFrame containing clinical goals, nominal values, passing rates,
+            cumulative passing rates if computed, and per-goal arrays.
+        filepath : str, optional
+            The file path where the JSON table will be saved. Default is "passing_rate_table.json".
+
+        Returns
+        -------
+        None
+        """
+        import json
+
+        def _json_safe(value):
+            if isinstance(value, np.ndarray):
+                return value.tolist()
+            if isinstance(value, np.generic):
+                return value.item()
+            if isinstance(value, pd.Series):
+                return [_json_safe(v) for v in value.tolist()]
+            if isinstance(value, list):
+                return [_json_safe(v) for v in value]
+            if isinstance(value, tuple):
+                return [_json_safe(v) for v in value]
+            if isinstance(value, dict):
+                return {k: _json_safe(v) for k, v in value.items()}
+            return value
+
+        exported_table = table.copy()
+
+        # The probability array is shared across all goals, so keep it once at top-level.
+        if "Probability Array" in exported_table.columns:
+            exported_table = exported_table.drop(columns=["Probability Array"])
+
+        payload = {
+            "Probability Mass": float(np.sum(self.prob_list)),
+            "Patient ID": self.patientData.patientID,
+            "Probability Array": _json_safe(np.array(self.prob_list)),
+            "Table": _json_safe(exported_table.to_dict(orient="records")),
+        }
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=4)
 
     def displayVminVmax(self,z_idx=None):
         """

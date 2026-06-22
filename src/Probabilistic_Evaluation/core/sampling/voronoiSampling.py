@@ -126,7 +126,8 @@ class VoronoiSampling(AbstractsamplingMethod):
             probabilities.append(prob)
         probabilities = np.array(probabilities)
         # Normalize probabilities to sum to 1
-        probabilities /= np.sum(probabilities)
+        # probabilities /= np.sum(probabilities)
+
         return probabilities
 
     def _generateVoronoiProbabilities(self, voronoiPoints: np.ndarray, computing_method: str, spacing: np.ndarray):
@@ -233,13 +234,17 @@ class VoronoiSampling(AbstractsamplingMethod):
         sorted_probabilities = self._voronoiProbabilities[sorted_indices]
         cumulative_probs = np.cumsum(sorted_probabilities)
 
-        num_cells = np.searchsorted(cumulative_probs, self.probabilityMass, side='right') + 1
-
+        # check what is the number of cells needed to reach the specified cumulative probability mass
+        num_cells = np.searchsorted(cumulative_probs, self.probabilityMass, side='right')
+        # take all the cells with exactly the same probability as the last one to include all cells with the same probability
+        while num_cells < len(sorted_probabilities) and sorted_probabilities[num_cells] == sorted_probabilities[num_cells - 1]:
+            num_cells += 1
+    
         reduced_indices = sorted_indices[:num_cells]
         reduced_points = self._voronoiPoints[reduced_indices]
         reduced_probabilities = self._voronoiProbabilities[reduced_indices]
 
         # Normalize the reduced probabilities to sum to 1
-        reduced_probabilities /= np.sum(reduced_probabilities)
+        #reduced_probabilities /= np.sum(reduced_probabilities)
 
         return reduced_points, reduced_probabilities

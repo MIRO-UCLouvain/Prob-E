@@ -34,13 +34,14 @@ class AbstractClinicalGoal(ABC):
         Method to compute the clinical goal value and success status based on the provided DVH.
     """
 
-    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, priority: int = 0, **kwargs):
+    def __init__(self, prescription: float, mask: np.ndarray, maskName: str, lower_is_better: bool = True, priority: int = 0, probabilistic: bool = False, **kwargs):
         if prescription < 0:
             raise ValueError("Clinical goal prescription cannot be negative.")
         self._prescription: float = prescription
         self._lower_is_better: bool = lower_is_better
         self._mask: np.ndarray = mask
         self._maskName: str = maskName
+        self._probabilistic: bool = probabilistic
      
         self._priority: int = priority
         self.valueList: np.ndarray = np.array([])
@@ -96,6 +97,14 @@ class AbstractClinicalGoal(ABC):
     @priority.setter
     def priority(self, newPriority: int):
         self._priority = newPriority
+
+    @property
+    def probabilistic(self) -> bool:
+        return self._probabilistic
+    
+    @probabilistic.setter
+    def probabilistic(self, newProbabilistic: bool):
+        self._probabilistic = newProbabilistic
 
     @abstractmethod
     def __str__(self):

@@ -32,7 +32,7 @@ class DicomReader():
         self.RTDOSE: np.ndarray = None
         self.spacing: tuple = None
         self.data = None
-        self.CTImage = None
+
     @timed
     def load_dicom_series(self,directory):
         """
@@ -49,32 +49,32 @@ class DicomReader():
         """
         self.data = readData(directory)
         print(f"Loaded {len(self.data)} DICOM files from {directory}")
-        self.CT,self.spacing = self.readCT()
-
+        self.CT,self.spacing,self.origin,self.gridSize = self.readCT()
         self.RTDOSE = self.readRTDOSE()
         self.RTSTRUCT = self.readRTSTRUCT()
 
     def readCT(self):
         for key in self.data:
             if isinstance(key, CTImage):
-                self.CTImage = key
                 CT = key.imageArray
                 spacing = key.spacing
+                origin = key.origin
+                gridSize = key.gridSize
+                self.patientID = key.seriesInstanceUID
                 print(f"CT Image shape: {CT.shape}, Spacing: {spacing}")
-                return CT, spacing
+                return CT, spacing, origin, gridSize
         raise ValueError("No CTImage found in the provided DICOM series.")
     
     def readRTDOSE(self):
         # Only return the first DoseImage found
         for key in self.data:
             if isinstance(key, DoseImage):
-                key.resample(self.spacing,self.CTImage.gridSize,self.CTImage.origin)
+                key.resample(self.spacing,self.gridSize,self.origin)
                 RTdose = key.imageArray
                 print(f"RTDOSE Image shape: {RTdose.shape} and spacing: {key.spacing}")
                 return RTdose
         raise ValueError("No DoseImage found in the provided DICOM series.")
 
-        
     
     def readRTSTRUCT(self):
         RTstruct_dictionary = {}

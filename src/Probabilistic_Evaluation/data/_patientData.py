@@ -28,7 +28,7 @@ class PatientData:
         Returns the mask array for the specified structure name.
     """
 
-    def __init__(self, ctImage: np.ndarray, doseImage: np.ndarray, maskDict: dict, spacing: tuple = (1.0, 1.0, 1.0)):
+    def __init__(self, ctImage: np.ndarray, doseImage: np.ndarray, maskDict: dict, spacing: tuple = (1.0, 1.0, 1.0), patientID= None,prescribedDose=None):
         # check matrix dimensions matches
         if ctImage.shape != doseImage.shape:
             raise ValueError("CT image and dose image must have the same dimensions.")
@@ -39,8 +39,10 @@ class PatientData:
         self._doseImage = doseImage
         self._maskDict = maskDict
         self._clinicalGoalsList = []
+        self.patientID = patientID
         self._spacing = spacing
         self.scenarioList = []
+        self.prescribedDose = prescribedDose
 
     @property
     def ctImage(self) -> np.ndarray:

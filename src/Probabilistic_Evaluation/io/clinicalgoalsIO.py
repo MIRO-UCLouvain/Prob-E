@@ -34,9 +34,11 @@ class clinicalgoalsreader():
         Read the clinical goals JSON file.
     """
 
-    def __init__(self, maskDict: dict=None,ct_image:CTImage=None):
+    def __init__(self, maskDict: dict=None, spacing=None, gridSize=None, origin=None):
         self._maskDict = maskDict
-        self._ct = ct_image
+        self._spacing = spacing
+        self._gridSize = gridSize
+        self._origin = origin
         self._path = None
         self.clinical_goals_dict: dict = None
         self._clinical_goals_list: list = None
@@ -100,7 +102,7 @@ class clinicalgoalsreader():
         #add sufficient checks here
         if goal_dict["ROI"] not in self.resampledMasks.keys():
             maskName=goal_dict["ROI"]
-            mask = self.maskDict[maskName].getBinaryMask(origin=self._ct.origin, gridSize=self._ct.gridSize, spacing=self._ct.spacing).imageArray
+            mask = self.maskDict[maskName].getBinaryMask(origin=self._origin, gridSize=self._gridSize, spacing=self._spacing).imageArray
             self.resampledMasks[maskName] = mask
         else: 
             maskName = goal_dict["ROI"]
@@ -108,6 +110,7 @@ class clinicalgoalsreader():
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority",0)
+        probabilistic=goal_dict.get("probabilistic", False)
         type = goal_dict["type"].upper()
 
         if type == "DMAX":         
@@ -130,6 +133,8 @@ class clinicalgoalsreader():
             goal = DXClinicalGoal(prescription=dose, mask=mask, maskName=maskName, priority=priority, lower_is_better=lower_is_better, volume=volume)
         else:
             raise ValueError(f"Unknown clinical goal type: {goal_dict['type']}")
+        if probabilistic:
+            goal.probabilistic(True)
         return goal
 
     def load_json_list(self):
