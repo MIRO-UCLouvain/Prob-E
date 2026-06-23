@@ -28,14 +28,12 @@ class PatientData:
         Returns the mask array for the specified structure name.
     """
 
-    def __init__(self, ctImage: np.ndarray, doseImage: np.ndarray, maskDict: dict, spacing: tuple = (1.0, 1.0, 1.0), patientID= None,prescribedDose=None):
+    def __init__(self, doseImage: np.ndarray, maskDict: dict, spacing: tuple = (1.0, 1.0, 1.0), patientID= None,prescribedDose=None):
         # check matrix dimensions matches
-        if ctImage.shape != doseImage.shape:
-            raise ValueError("CT image and dose image must have the same dimensions.")
         for structureName, mask in maskDict.items():
-            if mask.shape != ctImage.shape:
-                raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the CT image.")
-        self._ctImage = ctImage
+            if mask.shape != doseImage.shape:
+                raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the dose image.")
+
         self._doseImage = doseImage
         self._maskDict = maskDict
         self._clinicalGoalsList = []
@@ -43,16 +41,6 @@ class PatientData:
         self._spacing = spacing
         self.scenarioList = []
         self.prescribedDose = prescribedDose
-
-    @property
-    def ctImage(self) -> np.ndarray:
-        return self._ctImage
-
-    @ctImage.setter
-    def ctImage(self, newCtImage: np.ndarray):
-        if newCtImage.shape != self._ctImage.shape:
-            raise ValueError("New CT image must have the same dimensions as the existing CT image.")
-        self._ctImage = newCtImage
 
     @property
     def doseImage(self) -> np.ndarray:
@@ -71,8 +59,8 @@ class PatientData:
     @maskDict.setter
     def maskDict(self, newMaskDict: dict):
         for structureName, mask in newMaskDict.items():
-            if mask.shape != self._ctImage.shape:
-                raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the CT image.")
+            if mask.shape != self._doseImage.shape:
+                raise ValueError(f"Mask for structure '{structureName}' must have the same dimensions as the dose image.")
         self._maskDict = newMaskDict
 
     @property

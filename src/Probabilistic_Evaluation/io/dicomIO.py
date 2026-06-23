@@ -26,11 +26,13 @@ class DicomReader():
         An instance of the CTImage class from opentps.core.data.images, representing the CT image and its associated metadata.
     """
 
-    def __init__(self):
-        self.CT: np.ndarray = None
+    def __init__(self, spacing=None):
         self.RTSTRUCT: dict = None
         self.RTDOSE: np.ndarray = None
-        self.spacing: tuple = None
+        self.spacing: tuple = spacing
+        self.origin: tuple = None
+        self.gridSize: tuple = None
+        self.patientID = None
         self.data = None
 
     @timed
@@ -49,7 +51,6 @@ class DicomReader():
         """
         self.data = readData(directory)
         print(f"Loaded {len(self.data)} DICOM files from {directory}")
-        self.CT,self.spacing,self.origin,self.gridSize = self.readCT()
         self.RTDOSE = self.readRTDOSE()
         self.RTSTRUCT = self.readRTSTRUCT()
 
@@ -69,8 +70,19 @@ class DicomReader():
         # Only return the first DoseImage found
         for key in self.data:
             if isinstance(key, DoseImage):
-                key.resample(self.spacing,self.gridSize,self.origin)
+                if self.spacing is None :
+                    self.spacing = key.spacing
+                    self.gridSize = key.gridSize
+                else:
+                    newGridSize = (int(key.gridSize[0] * key.spacing[0] / self.spacing[0]),
+                                   int(key.gridSize[1] * key.spacing[1] / self.spacing[1]),
+                                   int(key.gridSize[2] * key.spacing[2] / self.spacing[2]))
+                    key.resample(self.spacing,newGridSize,key.origin)
+                    self.gridSize = newGridSize
+
                 RTdose = key.imageArray
+                self.origin = key.origin
+                self.patientID = key.seriesInstanceUID
                 print(f"RTDOSE Image shape: {RTdose.shape} and spacing: {key.spacing}")
                 return RTdose
         raise ValueError("No DoseImage found in the provided DICOM series.")

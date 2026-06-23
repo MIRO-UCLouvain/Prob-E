@@ -262,13 +262,12 @@ class ProbabilisticEvaluator:
             A DataFrame containing clinical goals, nominal values, nominal success, passing rates, and cumulative passing rates if computed.
         """
 
-        headers = ["Mask Name", "Clinical Goal", "Nominal Value", "Nominal Success", "Passing Rate"]
+        headers = ["Mask Name", "Clinical Goal", "Nominal Value", "Nominal Success", "Passing Rate","Probabilistic Objective"]
         if cumulativePassingRates is not None:
             headers.append("Cumulative Passing Rate")
         if cumulativeRelativePassingRates is not None:
             headers.append("Cumulative Relative Passing Rate")
         headers.append("Success Array")
-        headers.append("Probability Array")
 
         nominal_value,nominal_success = self.computeNominalValues()
 
@@ -289,7 +288,6 @@ class ProbabilisticEvaluator:
             if cumulativeRelativePassingRates is not None:
                 row["Cumulative Relative Passing Rate"] = cumulativeRelativePassingRates[i]
             row["Success Array"] = goal.successList
-            row["Probability Array"] = np.array(self.prob_list)
 
             rows.append(row)
 
@@ -496,10 +494,6 @@ class ProbabilisticEvaluator:
             return value
 
         exported_table = table.copy()
-
-        # The probability array is shared across all goals, so keep it once at top-level.
-        if "Probability Array" in exported_table.columns:
-            exported_table = exported_table.drop(columns=["Probability Array"])
 
         payload = {
             "Probability Mass": float(np.sum(self.prob_list)),
