@@ -1,3 +1,6 @@
+import numbers
+from unittest import result
+
 import numpy as np
 from scipy.spatial import cKDTree
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
@@ -227,6 +230,50 @@ class VoronoiSampling(AbstractsamplingMethod):
         reduced_probabilities : np.ndarray
             The probabilities associated with the reduced Voronoi points.
         """
+
+        if not (0 < self.probabilityMass <= 1):
+            raise ValueError("Cumulative probability must be between 0 and 1.")
+
+        norms = np.linalg.norm(self._voronoiPoints, axis=1)
+        unique_norms = np.unique(norms, return_inverse=True)
+        
+        # Average the probabilities for Voronoi points with the same norm, avoid MC sampling deviations 
+        for  norm_val in unique_norms:
+            self._voronoiProbabilities[norms == norm_val] = np.average(self._voronoiProbabilities[norms == norm_val])
+
+
+        sorted_indices = np.argsort(self._voronoiProbabilities)[::-1]
+        sorted_probabilities = self._voronoiProbabilities[sorted_indices]
+        cumulative_probs = np.cumsum(sorted_probabilities)
+
+        # check what is the number of cells needed to reach the specified cumulative probability mass
+        num_cells = np.searchsorted(cumulative_probs, self.probabilityMass, side='right')
+        # take all the cells with exactly the same probability as the last one to include all cells with the same probability
+        while num_cells < len(sorted_probabilities) and sorted_probabilities[num_cells] == sorted_probabilities[num_cells - 1]:
+            num_cells += 1
+    
+        reduced_indices = sorted_indices[:num_cells]
+        reduced_points = self._voronoiPoints[reduced_indices]
+        reduced_probabilities = self._voronoiProbabilities[reduced_indices]
+
+        # Normalize the reduced probabilities to sum to 1
+        #reduced_probabilities /= np.sum(reduced_probabilities)
+
+        return reduced_points, reduced_probabilities
+
+
+    def reduceScenariosAndAverage(self):
+        """
+        Reduce the number of Voronoi scenarios based on a specified cumulative probability threshold.
+
+        Returns
+        -------
+        reduced_points : np.ndarray
+            The reduced set of Voronoi points.
+        reduced_probabilities : np.ndarray
+            The probabilities associated with the reduced Voronoi points.
+        """
+
         if not (0 < self.probabilityMass <= 1):
             raise ValueError("Cumulative probability must be between 0 and 1.")
 
