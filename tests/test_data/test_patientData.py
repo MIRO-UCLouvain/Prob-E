@@ -5,29 +5,19 @@ from Probabilistic_Evaluation.data.clinicalGoals import *
 
 @pytest.fixture
 def sample_patient_data():
-    ct_image = np.random.rand(10, 10, 10)
     dose_image = np.random.rand(10, 10, 10)
     mask_dict = {
         "StructureA": np.random.randint(0, 2, size=(10, 10, 10)),
         "StructureB": np.random.randint(0, 2, size=(10, 10, 10))
     }
-    return PatientData(ct_image, dose_image, mask_dict)
+    return PatientData(dose_image, mask_dict)
 
 def test_initialization(sample_patient_data):
     patient_data = sample_patient_data
-    assert patient_data.ctImage.shape == (10, 10, 10)
     assert patient_data.doseImage.shape == (10, 10, 10)
     assert "StructureA" in patient_data._maskDict
     assert "StructureB" in patient_data._maskDict
     assert patient_data.spacing == (1.0, 1.0, 1.0)
-
-def test_ct_image_setter(sample_patient_data):
-    patient_data = sample_patient_data
-    new_ct_image = np.random.rand(10, 10, 10)
-    patient_data.ctImage = new_ct_image
-    assert np.array_equal(patient_data.ctImage, new_ct_image)
-    with pytest.raises(ValueError):
-        patient_data.ctImage = np.random.rand(5, 5, 5)
 
 def test_dose_image_setter(sample_patient_data):
     patient_data = sample_patient_data
