@@ -134,7 +134,7 @@ class clinicalgoalsreader():
         else:
             raise ValueError(f"Unknown clinical goal type: {goal_dict['type']}")
         if probabilistic:
-            goal.probabilistic(True)
+            goal.probabilistic = True
         return goal
 
     def load_json_list(self):
