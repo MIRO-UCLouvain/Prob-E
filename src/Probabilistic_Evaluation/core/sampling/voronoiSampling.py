@@ -90,7 +90,7 @@ class VoronoiSampling(AbstractsamplingMethod):
   
         return voronoiPoints
 
-    def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = 10000000):
+    def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = 100000000):
         """
         Compute Voronoi cell probabilities using Monte Carlo integration.
 
