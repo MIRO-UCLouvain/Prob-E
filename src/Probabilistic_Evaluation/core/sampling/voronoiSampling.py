@@ -28,13 +28,14 @@ class VoronoiSampling(AbstractsamplingMethod):
         Retrieve the precomputed Voronoi points and their probabilities.
     """
 
-    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, max_displacements: np.ndarray, spacing: np.ndarray,probabilityMass:float=None):
+    def __init__(self, uncertaintyModel: AbstractUncertaintyModel, max_displacements: np.ndarray, spacing: np.ndarray,probabilityMass:float=None, enhancedSampling: bool = False):
         super().__init__(uncertaintyModel)
         if max_displacements.shape != spacing.shape:
             raise ValueError("max_displacements and spacing must have the same shape.")
         self._voronoiPoints = None
         self._voronoiProbabilities = None
         self.probabilityMass = probabilityMass
+        self._enhanced = enhancedSampling
         self._generateVoronoiSampling(max_displacements, spacing, computing_method='analytical')
 
     @property
@@ -57,7 +58,8 @@ class VoronoiSampling(AbstractsamplingMethod):
             The maximum displacements for generating Voronoi points.
         spacing : np.ndarray
             The spacing between Voronoi points.
-
+        enhanced : bool (default=False)
+            If True, generate additional points to enhance the Voronoi sampling. These points are the middle points between the original points. This is useful for more accurate sampling, but increases the number of scenarios.
         Returns
         -------
         voronoiPoints : np.ndarray
@@ -67,7 +69,20 @@ class VoronoiSampling(AbstractsamplingMethod):
         limit_range = [np.arange(-b, b + 1) for b in rounded_bounds]
         XX, YY, ZZ = np.meshgrid(limit_range[0], limit_range[1], limit_range[2])
         voronoiPoints = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
-        print("Generated points {} for Voronoi Cells with spacing: {}".format(voronoiPoints.shape[0], spacing))
+        if self._enhanced:
+            # Generate additional points in between the original points but only in the middle of the cube defined by the original points. This is done to enhance the Voronoi sampling and provide more accurate results.
+            mid_points = []
+            for point in voronoiPoints:
+                mid_point = point.copy()
+                for i in range(3):
+                    mid_point[i] += 0.5
+                if np.all(np.abs(mid_point) <= rounded_bounds):
+                    mid_points.append(mid_point)
+            if mid_points:
+                voronoiPoints = np.vstack([voronoiPoints, np.array(mid_points)])
+            print("{} more points generated from enhanced sampling".format(len(mid_points)))
+        print("{} Total generated points for Voronoi Cells with spacing: {}".format(voronoiPoints.shape[0], spacing))
+  
         return voronoiPoints
 
     def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = 100000):
