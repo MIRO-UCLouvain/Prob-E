@@ -38,7 +38,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         self._voronoiPoints = None
         self._voronoiProbabilities = None
         self.probabilityMass = probabilityMass
-        self._enhanced = enhancedSampling
+        self.enhanced = enhancedSampling
         self._computing_method = 'montecarlo'  # Default computing method
         self._generateVoronoiSampling(max_displacements, spacing)
 
@@ -73,7 +73,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         limit_range = [np.arange(-b, b + 1) for b in rounded_bounds]
         XX, YY, ZZ = np.meshgrid(limit_range[0], limit_range[1], limit_range[2])
         voronoiPoints = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
-        if self._enhanced:
+        if self.enhanced:
             self._computing_method = 'montecarlo'  # Switch to Monte Carlo for enhanced sampling, needed for integral calculation of the probabilities of the Voronoi cells. 
             # Generate additional points in between the original points but only in the middle of the cube defined by the original points. This is done to enhance the Voronoi sampling and provide more accurate results.
             mid_points = []
@@ -252,7 +252,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         if not (0 < self.probabilityMass <= 1):
             raise ValueError("Cumulative probability must be between 0 and 1.")
 
-        if self._computing_method in ('montecarlo', 'analytical'):
+        if self._computing_method == 'montecarlo':
             #make sure all points at the same distance have the same probability to avoid MC sampling deviations
             norms = [np.linalg.norm(p) for p in self._voronoiPoints]
             norms = np.round(norms, decimals=6)#round to avoid floating point errors when comparing norms of points that are very close to each other
