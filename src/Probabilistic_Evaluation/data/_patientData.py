@@ -37,6 +37,7 @@ class PatientData:
         self._doseImage = doseImage
         self._maskDict = maskDict
         self._clinicalGoalsList = []
+        self._probabilisticGoalsList = []
         self.patientID = patientID
         self._spacing = spacing
         self.scenarioList = []
@@ -81,6 +82,11 @@ class PatientData:
     @clinicalGoalsList.setter
     def clinicalGoalsList(self, newClinicalGoalsList: list):
         self._clinicalGoalsList = newClinicalGoalsList
+        self._probabilisticGoalsList = [goal for goal in newClinicalGoalsList if goal.probabilistic]
+
+    @property
+    def probabilisticGoalsList(self) -> list:
+        return self._probabilisticGoalsList
 
     def getClinicalGoalsForStructure(self, structureName: str) -> list:
         """

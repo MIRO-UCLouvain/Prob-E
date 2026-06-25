@@ -42,6 +42,7 @@ class clinicalgoalsreader():
         self._path = None
         self.clinical_goals_dict: dict = None
         self._clinical_goals_list: list = None
+        self._proba_goals_list: list = None
         self._resampledMasks = {}
 
     @property
@@ -81,22 +82,30 @@ class clinicalgoalsreader():
     def clinical_goals_list(self, newClinicalGoalsList: list):
         self._clinical_goals_list = newClinicalGoalsList
 
+    @property
+    def proba_goals_list(self) -> list:
+        return self._proba_goals_list 
+
     @timed
     def load_JSON_list(self, clinicalgoalpath: str):
         self.path = clinicalgoalpath
-        self._clinical_goals_list = self.load_clinical_goals()
+        self._clinical_goals_list, self._proba_goals_list = self.load_clinical_goals()
         
 
     def load_clinical_goals(self):
         goals_dict_list = self.load_json_list()
         goals_list = []
+        proba_goals_list = []
         for goal in goals_dict_list:
             clinical_goal_obj = self.ClinicalGoalFromDict(goal)
+            if clinical_goal_obj.probabilistic:
+                proba_goals_list.append(clinical_goal_obj)
             goals_list.append(clinical_goal_obj)
         if all(hasattr(goal, "priority") for goal in goals_list):
             goals_list.sort(key=lambda x: x.priority)
+            proba_goals_list.sort(key=lambda x: x.priority)
         
-        return goals_list
+        return goals_list, proba_goals_list
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
