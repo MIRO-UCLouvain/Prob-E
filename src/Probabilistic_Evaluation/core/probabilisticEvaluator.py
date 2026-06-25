@@ -2,7 +2,7 @@ from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import Abstr
 from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
 from Probabilistic_Evaluation.data import DVH
-from Probabilistic_Evaluation.utils import timed, Timer
+from Probabilistic_Evaluation.utils import timed, Timer, shift_dose_for_enhanced_sampling
 import os
 
 import threading
@@ -52,7 +52,7 @@ class ProbabilisticEvaluator:
         self.scenarios = ScenariosGenerator(sampling_method=self.sampler).scenarios_list
         self.computeVWMin = kwargs.get('computeVWMin', False)
         self.computeVWMax = kwargs.get('computeVWMax', False)
-        self.computeCumulativePassingRates = kwargs.get('computeCumulativePassingRate', False)
+        self.computeCumulativePassingRates = kwargs.get('computeCumulativePassingRate', True)
 
         self.prob_list = np.array([s.probability for s in self.scenarios])
 
@@ -60,6 +60,7 @@ class ProbabilisticEvaluator:
         self.VWMax = None
 
         self.blurred_dose = None
+        self.half_shifted_dose = None  # Store the shifted+blurred dose for evaluation when using enhanced sampling
 
         self.nominal_index = [i for i, s in enumerate(self.scenarios) if np.allclose(s.displacement, [0, 0, 0])][
             0] if any(np.allclose(s.displacement, [0, 0, 0]) for s in self.scenarios) else None
@@ -86,9 +87,10 @@ class ProbabilisticEvaluator:
             A DataFrame containing clinical goals, nominal values, passing rates, and cumulative passing rates if computed
         """
         if self.sampler.UncertaintyModel.rand_parameters is not None:
-            self.blurred_dose = self.blur_dose()
-            self.displayblurandnominal(self.patientData.doseImage, self.blurred_dose)
-            print("Updated patient dose image with blurred dose")
+            self.blurred_dose = self.blur_dose(self.patientData.doseImage)
+            if self.sampler.enhanced:
+                self.half_shifted_dose = shift_dose_for_enhanced_sampling(self.blurred_dose)
+            
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
             goal.valueList = np.empty(n_scenarios)
@@ -128,11 +130,15 @@ class ProbabilisticEvaluator:
         None
 
         """
-
-        # We use blurred dose because of fractionation
         if self.blurred_dose is not None:
-            scenario.compute_shifted_image(self.blurred_dose, scenario.displacement)
-
+            if np.allclose(scenario.displacement % 1, 0, atol=1e-6):
+                scenario.compute_shifted_image(self.blurred_dose, scenario.displacement)
+                print(scenario.displacement, "Using blurred dose for evaluation")
+            elif self.half_shifted_dose is not None:
+                shift = np.array(scenario.displacement) - 0.5
+                scenario.compute_shifted_image(self.half_shifted_dose, shift)
+                print(scenario.displacement, "Using half-shifted blurred dose for evaluation, with corrected shift:", shift)
+        
         # Fractionation is not considered, we use the original dose image for evaluation
         else:
             scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
@@ -350,7 +356,7 @@ class ProbabilisticEvaluator:
         df["Cumulative Relative Passing Rate"] = cum_rel_rates
 
         return df
-    def blur_dose(self):
+    def blur_dose(self, dosemap: np.ndarray) -> np.ndarray:
         """
         Apply Gaussian blurring to the dose map based on the random setup error parameters.
 
@@ -369,7 +375,7 @@ class ProbabilisticEvaluator:
         np.ndarray
             A 3D array representing the blurred dose map.
         """
-        dosemap = self.patientData.doseImage
+      
         rand_parameters = self.sampler.UncertaintyModel.rand_parameters
         
         sigma_x = rand_parameters['sigma_x']
@@ -380,6 +386,8 @@ class ProbabilisticEvaluator:
         blurred_dosemap = sp.ndimage.gaussian_filter(dosemap, sigma=[sigma_x, sigma_y, sigma_z] / self.patientData.spacing)
         return blurred_dosemap
     
+    
+
     def createHTMLtable(self, table: pd.DataFrame):
         """
         Create an HTML representation of the passing rate table with color coding for better visualization.

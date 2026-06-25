@@ -2,6 +2,7 @@ import numpy as np
 import time
 import threading
 from functools import wraps
+from scipy.ndimage import shift
 
 def shift_dose_image(doseImage, shift):
     """
@@ -24,6 +25,11 @@ def shift_dose_image(doseImage, shift):
         raise ValueError("Shift dimensions must match dose image dimensions.")
     shifted_dose = np.roll(doseImage, shift=shift, axis=(0, 1, 2))
     return shifted_dose
+
+def shift_dose_for_enhanced_sampling(doseImage):
+        shift_vec = [0.5, 0.5, 0.5]  # Shift by half a voxel in each dimension
+        half_shifted_dose = shift(doseImage, shift=shift_vec, order=1, mode='constant' )  
+        return half_shifted_dose
 
 def linearInterpolator(x: float, x_array: np.ndarray, y_array: np.ndarray) -> float:
     """

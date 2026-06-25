@@ -15,8 +15,8 @@ class PatientData:
         A dictionary where keys are structure names (str) and values are 3D numpy arrays representing binary masks for those structures.
     clinicalGoalsList : list
         A list of clinical goal objects associated with the patient.
-    spacing : tuple (default=(1.0, 1.0, 1.0))
-        A tuple representing the voxel spacing in each dimension (x, y, z).
+    spacing : np.ndarray
+        A numpy array representing the voxel spacing in each dimension (x, y, z).
     scenarioList : list
         A list of scenario objects associated with the patient.
 
@@ -28,7 +28,7 @@ class PatientData:
         Returns the mask array for the specified structure name.
     """
 
-    def __init__(self, doseImage: np.ndarray, maskDict: dict, spacing: tuple = (1.0, 1.0, 1.0), patientID= None,prescribedDose=None):
+    def __init__(self, doseImage: np.ndarray, maskDict: dict, spacing: np.ndarray, patientID= None,prescribedDose=None):
         # check matrix dimensions matches
         for structureName, mask in maskDict.items():
             if mask.shape != doseImage.shape:
@@ -65,11 +65,11 @@ class PatientData:
         self._maskDict = newMaskDict
 
     @property
-    def spacing(self) -> tuple:
+    def spacing(self) -> np.ndarray:
         return self._spacing
 
     @spacing.setter
-    def spacing(self, newSpacing: tuple):
+    def spacing(self, newSpacing: np.ndarray):
         for dim in newSpacing:
             if dim <= 0:
                 raise ValueError("Spacing values must be positive.")
