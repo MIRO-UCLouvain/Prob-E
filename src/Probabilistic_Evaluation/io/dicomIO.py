@@ -5,6 +5,8 @@ from opentps.core.data import RTStruct
 import numpy as np
 
 from Probabilistic_Evaluation.utils import timed, Timer
+from Probabilistic_Evaluation.logging_utils import log_call, logger
+
 
 class DicomReader():
     """
@@ -50,7 +52,6 @@ class DicomReader():
             None
         """
         self.data = readData(directory)
-        print(f"Loaded {len(self.data)} DICOM files from {directory}")
         self.RTDOSE = self.readRTDOSE()
         self.RTSTRUCT = self.readRTSTRUCT()
 
@@ -62,7 +63,12 @@ class DicomReader():
                 origin = key.origin
                 gridSize = key.gridSize
                 self.patientID = key.seriesInstanceUID
-                print(f"CT Image shape: {CT.shape}, Spacing: {spacing}")
+                logger.info(f"CT Image shape: {CT.shape}, Spacing: {spacing}")
+                logger.debug(f"CT Image origin: {origin}, Grid Size: {gridSize}")
+                if hasattr(key, 'ImagepositionPatient'):
+                    logger.debug(f"CT Image Position Patient: {key.ImagepositionPatient}")
+                if hasattr(key, 'ImageOrientationPatient'):
+                    logger.debug(f"CT Image Orientation Patient: {key.ImageOrientationPatient}")
                 return CT, spacing, origin, gridSize
         raise ValueError("No CTImage found in the provided DICOM series.")
     
@@ -83,7 +89,14 @@ class DicomReader():
                 RTdose = key.imageArray
                 self.origin = key.origin
                 self.patientID = key.seriesInstanceUID
-                print(f"RTDOSE Image shape: {RTdose.shape} and spacing: {key.spacing}")
+                logger.info(f"RTDOSE Image shape: {RTdose.shape} and spacing: {key.spacing}")
+                logger.debug(f"RTDOSE Image origin: {key.origin}, Grid Size: {key.gridSize}")
+                logger.debug("Max dose value in RTDOSE: {:.2f}".format(np.max(RTdose)))
+                logger.debug("Min dose value in RTDOSE: {:.2f}".format(np.min(RTdose)))
+                if hasattr(key, 'ImagepositionPatient'):
+                    logger.debug(f"Dose Image Position Patient: {key.ImagepositionPatient}")
+                if hasattr(key, 'ImageOrientationPatient'):
+                    logger.debug(f"Dose Image Orientation Patient: {key.ImageOrientationPatient}")
                 return RTdose
         raise ValueError("No DoseImage found in the provided DICOM series.")
 
@@ -93,9 +106,9 @@ class DicomReader():
         for key in self.data:
             if isinstance(key, RTStruct):
                 RTstruct = key
-                print(f"RTSTRUCT loaded with {len(RTstruct.name)} structures.")
+                logger.info(f"RTSTRUCT loaded with {len(RTstruct.name)} structures.")
                 for contour in RTstruct._contours:
-                    print(f"Structure: {contour.name}")
+                    logger.info(f"Structure: {contour.name}")
                     RTstruct_dictionary[contour.name] = contour
                     
                 return RTstruct_dictionary

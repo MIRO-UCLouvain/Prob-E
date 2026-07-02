@@ -3,6 +3,7 @@ from unittest import result
 
 import numpy as np
 from scipy.spatial import cKDTree
+from Probabilistic_Evaluation.logging_utils import logger, log_call
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
 from Probabilistic_Evaluation.data.uncertaintyModel._abstractUncertaintyModel import AbstractUncertaintyModel
 
@@ -39,9 +40,12 @@ class VoronoiSampling(AbstractsamplingMethod):
         self._voronoiProbabilities = None
         self.probabilityMass = probabilityMass
         self.enhanced = enhancedSampling
-        self._computing_method = 'montecarlo'  # Default computing method
+        self._computing_method = 'analytical'  # Default computing method
+        logger.info(f"Voronoi sampling initialized with total probability mass: {self.probabilityMass}, enhanced sampling grid: {self.enhanced}" )
         self._generateVoronoiSampling(max_displacements, spacing)
 
+        
+        
     @property
     def voronoiPoints(self) -> np.ndarray:
         """Voronoi points generated within the specified bounds and spacing."""
@@ -52,6 +56,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         """Probabilities associated with each Voronoi point."""
         return self._voronoiProbabilities
 
+    @log_call(log_result=True)
     def _generateVoronoiPoints(self, max_displacements: np.ndarray, spacing: np.ndarray) -> np.ndarray:
         """
         Generate Voronoi points within the specified bounds and spacing.
@@ -71,10 +76,12 @@ class VoronoiSampling(AbstractsamplingMethod):
         """
         rounded_bounds = np.around(max_displacements / spacing)
         limit_range = [np.arange(-b, b + 1) for b in rounded_bounds]
+        logger.debug(f"Generating Voronoi points with bounds: {rounded_bounds}, spacing: {spacing}, limit_range: {limit_range[0]}")
         XX, YY, ZZ = np.meshgrid(limit_range[0], limit_range[1], limit_range[2])
         voronoiPoints = np.vstack([XX.ravel(), YY.ravel(), ZZ.ravel()]).T
         if self.enhanced:
-            self._computing_method = 'montecarlo'  # Switch to Monte Carlo for enhanced sampling, needed for integral calculation of the probabilities of the Voronoi cells. 
+            self._computing_method = 'montecarlo'
+            logger.info("Switching to Monte Carlo probability calculation for enhanced sampling, needed for integral calculation of the probabilities of the Voronoi cells.")
             # Generate additional points in between the original points but only in the middle of the cube defined by the original points. This is done to enhance the Voronoi sampling and provide more accurate results.
             mid_points = []
             for point in voronoiPoints:
@@ -85,11 +92,12 @@ class VoronoiSampling(AbstractsamplingMethod):
                     mid_points.append(mid_point)
             if mid_points:
                 voronoiPoints = np.vstack([voronoiPoints, np.array(mid_points)])
-            print("{} more points generated from enhanced sampling".format(len(mid_points)))
-        print("{} Total generated points for Voronoi Cells with spacing: {}".format(voronoiPoints.shape[0], spacing))
-  
+            logger.debug("{} more points generated from enhanced sampling".format(len(mid_points)))
+        logger.info("{} Total generated points for Voronoi Cells with spacing: {}".format(voronoiPoints.shape[0], spacing))
+
         return voronoiPoints
 
+    @log_call(log_result=True)
     def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = 10000000):
         """
         Compute Voronoi cell probabilities using Monte Carlo integration.
@@ -116,9 +124,10 @@ class VoronoiSampling(AbstractsamplingMethod):
         counts = np.bincount(indices, minlength=voronoiPoints.shape[0])
         # Calculate probabilities
         probabilities = counts / num_samples
+        logger.debug(f"Monte Carlo sampling completed with {num_samples} samples. Probabilities computed for {len(probabilities)} Voronoi cells.")
         return probabilities
 
- 
+    @log_call(log_result=True)
     def _computeVoronoiProbabilitiesAnalytical(self, voronoiPoints: np.ndarray, spacing: np.ndarray):
         """
         Compute Voronoi cell probabilities using analytical integration.
@@ -148,9 +157,10 @@ class VoronoiSampling(AbstractsamplingMethod):
         probabilities = np.array(probabilities)
         # Normalize probabilities to sum to 1
         # probabilities /= np.sum(probabilities)
-
+        logger.debug(f"Analytical probability computation completed for {len(probabilities)} Voronoi cells.")
         return probabilities
 
+    @log_call(log_result=True)
     def _generateVoronoiProbabilities(self, voronoiPoints: np.ndarray, spacing: np.ndarray):
         """
         Generate Voronoi cell probabilities based on the specified computing method.
@@ -170,12 +180,15 @@ class VoronoiSampling(AbstractsamplingMethod):
             The computed probabilities for each Voronoi cell.
         """
         if self._computing_method == 'montecarlo':
+            logger.info(f"Computing Voronoi probabilities via Monte Carlo")
             return self._computeVoronoiProbabilitiesMC(voronoiPoints)
         elif self._computing_method == 'analytical':
+            logger.info(f"Computing Voronoi probabilities analytically")
             return self._computeVoronoiProbabilitiesAnalytical(voronoiPoints, spacing)
         else:
             raise ValueError("Computing method must be 'montecarlo' or 'analytical'.")
 
+    @log_call(log_result=True)
     def _generateVoronoiSampling(self, bounds: np.ndarray, spacing: np.ndarray):
         """
         Generate Voronoi sampling points and their associated probabilities and store them as attributes.
@@ -197,8 +210,10 @@ class VoronoiSampling(AbstractsamplingMethod):
         self._voronoiProbabilities = self._generateVoronoiProbabilities(self._voronoiPoints, spacing)
 
         if self.probabilityMass is not None:
+            logger.info(f"Reducing number of scenarios to retain cumulative probability mass: {self.probabilityMass}")
             self._voronoiPoints, self._voronoiProbabilities = self.reduceNumberOfScenarios()
 
+    @log_call(log_result=True)
     def MCsampling(self, **kwargs):
         """
         Perform Monte Carlo sampling based on the Voronoi points and their probabilities.
@@ -221,8 +236,10 @@ class VoronoiSampling(AbstractsamplingMethod):
 
         samples = self.voronoiPoints[indexes]
         probs = self.voronoiProbabilities[indexes]
+        logger.debug(f"This function is not implemented yet, and should not be used, is only a placeholder for future implementation.")
         return samples, probs
 
+    @log_call(log_result=True)
     def analyticalSampling(self, **kwargs):
         """
         Retrieve the precomputed Voronoi points and their probabilities.
@@ -237,6 +254,7 @@ class VoronoiSampling(AbstractsamplingMethod):
 
         return self._voronoiPoints, self._voronoiProbabilities
 
+    @log_call(log_result=True)
     def reduceNumberOfScenarios(self):
         """
         Reduce the number of Voronoi scenarios based on a specified cumulative probability threshold.
@@ -257,13 +275,13 @@ class VoronoiSampling(AbstractsamplingMethod):
             norms = [np.linalg.norm(p) for p in self._voronoiPoints]
             norms = np.round(norms, decimals=6)#round to avoid floating point errors when comparing norms of points that are very close to each other
             unique_norms, inverse = np.unique(norms, return_inverse=True)
-            print("Unique norms found:", unique_norms)
+            logger.debug(f"Unique displacement norms found: {unique_norms}")
     
             # Average the probabilities for Voronoi points with the same norm 
             for  norm_val in unique_norms:
                 probs_with_same_norm = self._voronoiProbabilities[norms == norm_val]
                 self._voronoiProbabilities[norms == norm_val] = np.average(probs_with_same_norm)
-                print(f"Average probability for norm {norm_val}: {self._voronoiProbabilities[norms == norm_val][0]}")
+                logger.debug(f"Average probability for norm {norm_val}: {self._voronoiProbabilities[norms == norm_val][0]}")
 
         sorted_indices = np.argsort(self._voronoiProbabilities)[::-1]
         sorted_probabilities = self._voronoiProbabilities[sorted_indices]
@@ -278,7 +296,8 @@ class VoronoiSampling(AbstractsamplingMethod):
         reduced_indices = sorted_indices[:num_cells]
         reduced_points = self._voronoiPoints[reduced_indices]
         reduced_probabilities = self._voronoiProbabilities[reduced_indices]
-
+        logger.info(f"Reduced number of Voronoi scenarios from {len(self._voronoiPoints)} to {len(reduced_points)} to retain cumulative probability mass of +-{self.probabilityMass}.")
+        logger.info(f"Effective cumulative probability mass of the reduced scenarios: {round(np.sum(reduced_probabilities), 6)}, to make sure all equiprobable scenarios are included. ")
         # Normalize the reduced probabilities to sum to 1
         #reduced_probabilities /= np.sum(reduced_probabilities)
         return reduced_points, reduced_probabilities

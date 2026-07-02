@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy.special import erf
-
+from Probabilistic_Evaluation.logging_utils import logger, log_call
 from ._abstractUncertaintyModel import AbstractUncertaintyModel
 
 
@@ -55,14 +55,20 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
             sigma = marginSize/(2.5*np.sqrt(1+1/n)+0.7)
             self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
             self.rand_parameters = {'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
+            logger.info(f"Initialized {self.name} with systematic parameters: {self.sys_parameters} and random parameters: {self.rand_parameters}")
+            logger.debug(f"Calculated sigma for systematic and random errors based on marginSize={marginSize}, n_fractions={n}, simulateRandom={simulateRandom}: {sigma}")
         elif manual_input is None:
             # if we do not consider random errors, we only account for systematic errors
             self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': marginSize/2.5, 'sigma_y': marginSize/2.5, 'sigma_z': marginSize/2.5}
             self.rand_parameters = None
+            logger.info(f"Initialized {self.name} with systematic parameters: {self.sys_parameters} and no random parameters (simulateRandom={simulateRandom})")
+            logger.debug(f"Calculated sigma for systematic errors based on marginSize={marginSize}, simulateRandom={simulateRandom}: {marginSize/2.5}")
         else:
             self.sys_parameters = manual_input['sys_parameters']
             self.rand_parameters = manual_input['rand_parameters']
-
+            logger.info(f"Initialized {self.name} with manual input parameters: systematic parameters: {self.sys_parameters} and random parameters: {self.rand_parameters}")
+        
+    @log_call(log_result=True)
     def pdf(self, x):
         """
         Compute the probability density function at point x.
@@ -90,7 +96,8 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
                      ((x[2] - mu_z) ** 2) / (2 * sigma_z ** 2))
 
         return coeff * np.exp(exponent)
-
+    
+    @log_call(log_result=True)
     def cdf(self, x):
         """
         Compute the cumulative distribution function at point x.
@@ -118,6 +125,7 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
 
         return cdf_x * cdf_y * cdf_z
 
+    @log_call(log_result=True)
     def sample(self, n):
         """
         Generate n random samples from the 3D Gaussian uncertainty model.
@@ -147,6 +155,7 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         samples = np.random.multivariate_normal(mean, cov, n)
         return samples
 
+    @log_call(log_result=True)
     def boundedIntegral(self, a, b):
         """
         Compute the integral of the 3D Gaussian function over the bounded region defined by a and b.
@@ -173,6 +182,7 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         else:
             raise NotImplementedError("Bounded integral for non-zero mean is not implemented yet.")
 
+    @log_call(log_result=True)
     def bounded1DIntegral(self, a, b, mu, sigma):
         """
         Compute the integral of a 1D Gaussian function from a to b.

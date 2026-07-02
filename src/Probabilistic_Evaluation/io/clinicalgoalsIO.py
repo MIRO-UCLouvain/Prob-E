@@ -1,8 +1,9 @@
 import json
-
+import numpy as np
 
 from Probabilistic_Evaluation.data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
 from Probabilistic_Evaluation.data.clinicalGoals import * 
+from Probabilistic_Evaluation.logging_utils import log_call, logger
 from Probabilistic_Evaluation.utils import timed, Timer
 from opentps.core.data.images import CTImage
 
@@ -97,16 +98,18 @@ class clinicalgoalsreader():
             goals_list.sort(key=lambda x: x.priority)
         
         return goals_list
-
+    @log_call(log_result=True)
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
         if goal_dict["ROI"] not in self.resampledMasks.keys():
             maskName=goal_dict["ROI"]
             mask = self.maskDict[maskName].getBinaryMask(origin=self._origin, gridSize=self._gridSize, spacing=self._spacing).imageArray
             self.resampledMasks[maskName] = mask
+            logger.info(f"Resampled mask for ROI: {maskName} with shape: {mask.shape} and spacing: {self._spacing}")
         else: 
             maskName = goal_dict["ROI"]
             mask = self.resampledMasks[maskName]
+        
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority",0)
@@ -135,8 +138,10 @@ class clinicalgoalsreader():
             raise ValueError(f"Unknown clinical goal type: {goal_dict['type']}")
         if probabilistic:
             goal.probabilistic(True)
+        logger.debug(f"Creating clinical goal for ROI: {maskName}, type: {type}, number of voxels in mask: {np.sum(mask)}")
         return goal
 
+    
     def load_json_list(self):
         with open(self.path, "r") as f:
             goals = json.load(f)
