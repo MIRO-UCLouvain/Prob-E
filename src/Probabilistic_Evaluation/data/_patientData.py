@@ -41,7 +41,7 @@ class PatientData:
         self.patientID = patientID
         self._spacing = spacing
         self.scenarioList = []
-        self.prescribedDose = prescribedDose
+        # self.prescribedDose = prescribedDose
 
     @property
     def doseImage(self) -> np.ndarray:

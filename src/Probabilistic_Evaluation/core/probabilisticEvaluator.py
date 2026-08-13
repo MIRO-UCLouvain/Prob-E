@@ -177,9 +177,10 @@ class ProbabilisticEvaluator:
 
         # We need to recompute the goals for a non_blured_dose
         if self.blurred_dose is not None:
-            
-            for mask in self.patientData.maskDict.keys():
-                dvh_dict[mask] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
+
+            for maskname in self.patientData.maskDict.keys():
+
+                dvh_dict[maskname] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[maskname], spacing=self.patientData.spacing)
             for goal in self.patientData.clinicalGoalsList:
                 value, success = goal.compute(dvh_dict[goal.maskName])
                 value_list.append(value)
@@ -187,8 +188,9 @@ class ProbabilisticEvaluator:
 
         # We can use the nominal index to directly get the values from the goal's valueList
         else:
-            for mask in self.patientData.maskDict.keys():
-                dvh_dict[mask] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
+            for maskname in self.patientData.maskDict.keys():
+
+                dvh_dict[maskname] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[maskname], spacing=self.patientData.spacing)
             for goal in self.patientData.clinicalGoalsList:
                 if goal.probabilistic:
                     value = goal.valueList[self.nominal_index] if self.nominal_index is not None and len(goal.valueList) > self.nominal_index else None

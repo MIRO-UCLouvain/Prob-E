@@ -90,7 +90,7 @@ class VoronoiSampling(AbstractsamplingMethod):
   
         return voronoiPoints
 
-    def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = 100000000):
+    def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = int(1e7)):
         """
         Compute Voronoi cell probabilities using Monte Carlo integration.
 
@@ -257,13 +257,11 @@ class VoronoiSampling(AbstractsamplingMethod):
             norms = [np.linalg.norm(p) for p in self._voronoiPoints]
             norms = np.round(norms, decimals=6)#round to avoid floating point errors when comparing norms of points that are very close to each other
             unique_norms, inverse = np.unique(norms, return_inverse=True)
-            print("Unique norms found:", unique_norms)
     
             # Average the probabilities for Voronoi points with the same norm 
             for  norm_val in unique_norms:
                 probs_with_same_norm = self._voronoiProbabilities[norms == norm_val]
                 self._voronoiProbabilities[norms == norm_val] = np.average(probs_with_same_norm)
-                print(f"Average probability for norm {norm_val}: {self._voronoiProbabilities[norms == norm_val][0]}")
 
         sorted_indices = np.argsort(self._voronoiProbabilities)[::-1]
         sorted_probabilities = self._voronoiProbabilities[sorted_indices]
