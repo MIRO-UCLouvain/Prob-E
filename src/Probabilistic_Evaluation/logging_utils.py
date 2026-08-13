@@ -1,5 +1,6 @@
 # Probabilistic_Evaluation/logging_utils.py
 import logging
+import os
 import sys
 import platform
 import importlib.metadata
@@ -43,7 +44,8 @@ def enable_logging(to_file: bool = False, log_dir: str = ".\\Logs",
     if to_file:
         Path(log_dir).mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_path = Path(log_dir) / f"ProbEval_{timestamp}.log"
+        log_path = Path(log_dir) / f"Log_file.log"
+        Path(log_path).unlink(missing_ok=True)
         file_handler = logging.FileHandler(log_path, encoding="utf-8")
         file_handler.setLevel(file_level)
         file_handler.setFormatter(fmt)
