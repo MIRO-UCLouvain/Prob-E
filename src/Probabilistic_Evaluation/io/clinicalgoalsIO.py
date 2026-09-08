@@ -3,7 +3,7 @@ import json
 
 from Probabilistic_Evaluation.data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
 from Probabilistic_Evaluation.data.clinicalGoals import * 
-from Probabilistic_Evaluation.utils import timed, Timer
+from Probabilistic_Evaluation.utils import timed, Timer, get_partial_volume_mask
 from opentps.core.data.images import CTImage
 
 
@@ -44,6 +44,7 @@ class clinicalgoalsreader():
         self._clinical_goals_list: list = None
         self._proba_goals_list: list = None
         self._resampledMasks = {}
+        self._partial_volume_masks = {}
 
     @property
     def maskDict(self) -> dict:
@@ -59,6 +60,14 @@ class clinicalgoalsreader():
     @resampledMasks.setter
     def resampledMasks(self, newResampledMasks: dict):
         self._resampledMasks = newResampledMasks
+
+    @property
+    def partial_volume_masks(self) -> dict:
+        return self._partial_volume_masks
+
+    @partial_volume_masks.setter
+    def partial_volume_masks(self, newPartialVolumeMasks: dict):
+        self._partial_volume_masks = newPartialVolumeMasks
 
     @property
     def path(self) -> str:
@@ -109,13 +118,81 @@ class clinicalgoalsreader():
 
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
+        import time
+        import numpy as np
         if goal_dict["ROI"] not in self.resampledMasks.keys():
+            # gtvRS = np.load("masks/mask_GTV.npy", allow_pickle=True)
+            # gtvRS = np.reshape(gtvRS, (self._gridSize[0], self._gridSize[1], self._gridSize[2]), order='F')
+
+            # gtvRS = np.load("masks/GTV_222.npy", allow_pickle=True)
+            # gtvRS = gtvRS / 255.0  # normalize to [0, 1]
+
+            gtvRS = np.load("masks/GTV_111.npy", allow_pickle=True)
+            gtvRS = np.transpose(gtvRS, (2, 1, 0))  # transpose to match the orientation of the mask
+            # gtvRS = np.roll(gtvRS, shift=-1, axis=(0,1))  # roll the array to align with the mask
+            # gtvRS = gtvRS[::2, ::2, ::2]  # downsample to match the mask shape
+            # gtvRS = gtvRS[:-1, :-1, :-1]  # crop to match the mask shape
+
+            start_time = time.time()
             maskName=goal_dict["ROI"]
-            mask = self.maskDict[maskName].getBinaryMask(origin=self._origin, gridSize=self._gridSize, spacing=self._spacing).imageArray
+            maskOpenTPS = self.maskDict[maskName].get_partial_volume_mask(origin=self._origin, gridSize=self._gridSize, spacing=self._spacing).imageArray
+            
+            maskPartialVolume = get_partial_volume_mask(
+                contour=self.maskDict[maskName],
+                origin=self._origin,
+                gridSize=self._gridSize,
+                spacing=self._spacing,
+                precision= 16
+            )
+            stop_time = time.time()
+
+            print(f"finished resampling partial volume mask for {goal_dict['ROI']} in {stop_time - start_time:.2f} seconds")
+            if maskName == "GTV":
+                    mask = maskOpenTPS
+                    # mask = mask > 0.5
+                    # mask = mask.astype(int)
+                    import matplotlib.pyplot as plt
+                    # make a slider to go through the slices
+                    from matplotlib.widgets import Slider
+                    plt.subplots_adjust(bottom=0.25)
+                    ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
+                    slider = Slider(ax_slider, 'Slice', 0, mask.shape[2] - 1, valinit=mask.shape[2] // 2, valstep=1)
+      
+                    # gtvRS = gtvRS >= 0.5  # convert to binary mask
+                    # gtvRS = gtvRS.astype(int)  # roll the array to align with the mask
+                    # gtvRS = np.roll(gtvRS, shift=-1, axis=(0,1))
+
+                    def update(val):
+                        slice = int(slider.val)
+    
+                        plt.subplot(1, 3, 1)
+                        plt.imshow(mask[:, :, slice], cmap='jet')
+                        plt.title(f"Partial Volume Mask for {maskName}")
+                        plt.colorbar()
+
+                        plt.subplot(1, 3, 2)
+                        plt.imshow(gtvRS[:, :, slice], cmap='jet')
+                        plt.title("GTV from RS")
+                        plt.colorbar()
+
+                        plt.subplot(1, 3, 3)
+                        difference = (mask - gtvRS)
+                        plt.imshow(difference[:, :, slice], cmap='jet')
+                        plt.title("Difference between computed mask and RS GTV")
+                        plt.colorbar()
+                        plt.draw()
+
+
+                    slider.on_changed(update)
+                    plt.show()
+
+            mask = maskPartialVolume
+            self.partial_volume_masks[maskName] = mask  
             self.resampledMasks[maskName] = mask
         else: 
             maskName = goal_dict["ROI"]
             mask = self.resampledMasks[maskName]
+
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority",0)
