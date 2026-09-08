@@ -7,6 +7,8 @@ from functools import wraps
 from skimage.draw import polygon2mask
 from scipy.ndimage import shift
 
+from Probabilistic_Evaluation.logging_utils import log_call, logger
+
 def shift_dose_image(doseImage, shift):
     """
     Shift the dose image by the specified amount in each dimension.
@@ -16,13 +18,15 @@ def shift_dose_image(doseImage, shift):
     doseImage : np.ndarray
         The dose image to be shifted.
     shift : tuple
-        A tuple specifying the shift in each dimension (z, y, x).
+        A tuple specifying the shift in each dimension (x,y,z).
 
     Returns
-    -------
+    ------- 
     shifted_dose : np.ndarray
         The shifted dose image.
     """
+    logger.debug(f"Shifting dose image by {shift} voxels.")
+    
     shift = (int(round(shift[0])), int(round(shift[1])), int(round(shift[2])))
     if len(shift) != doseImage.ndim:
         raise ValueError("Shift dimensions must match dose image dimensions.")
@@ -30,9 +34,11 @@ def shift_dose_image(doseImage, shift):
     return shifted_dose
 
 def shift_dose_for_enhanced_sampling(doseImage):
-    shift_vec = [0.5, 0.5, 0.5]  # Shift by half a voxel in each dimension
-    half_shifted_dose = shift(doseImage, shift=shift_vec, order=1, mode="constant")
-    return half_shifted_dose
+        shift_vec = [0.5, 0.5, 0.5]  # Shift by half a voxel in each dimension
+        logger.debug(f"Shifting dose image for enhanced sampling by {shift_vec} voxels.")
+        half_shifted_dose = shift(doseImage, shift=shift_vec, order=1, mode='constant' )  
+        return half_shifted_dose
+
 
 def linearInterpolator(x: float, x_array: np.ndarray, y_array: np.ndarray) -> float:
     """

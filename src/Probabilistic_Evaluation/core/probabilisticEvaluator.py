@@ -3,8 +3,10 @@ from Probabilistic_Evaluation.core.scenariosGenerator import ScenariosGenerator
 from Probabilistic_Evaluation.data import PatientData
 from Probabilistic_Evaluation.data import DVH
 from Probabilistic_Evaluation.utils import timed, Timer, shift_dose_for_enhanced_sampling
-import os
+from Probabilistic_Evaluation.logging_utils import logger, log_call, GroupedMemoryHandler
 
+import os
+import logging
 import threading
 import multiprocessing
 import time
@@ -75,9 +77,14 @@ class ProbabilisticEvaluator:
             self.nThreads = multiprocessing.cpu_count()-1
         else:
             self.nThreads = nThreads
+        logger.info(f"ProbabilisticEvaluator initialized with {len(self.scenarios)} scenarios, using {self.nThreads} threads.")
+        logger.debug(f"Patient ID: {self.patientData.patientID}, Number of clinical goals: {len(self.patientData.clinicalGoalsList)}, Sampler: {type(self.sampler).__name__}, Compute VWMin: {self.computeVWMin}, Compute VWMax: {self.computeVWMax}, Compute Cumulative Passing Rates: {self.computeCumulativePassingRates}")
+        logger.debug(f"Nominal scenario index: {self.nominal_index}, Blurred dose computed: {self.blurred_dose is not None}, Half-shifted dose computed: {self.half_shifted_dose is not None}")
+        logger.debug(f"Max value blurred dose: {np.max(self.blurred_dose) if self.blurred_dose is not None else 'N/A'}, Max value half-shifted dose: {np.max(self.half_shifted_dose) if self.half_shifted_dose is not None else 'N/A'}")
+        logger.debug(f"Min value blurred dose: {np.min(self.blurred_dose) if self.blurred_dose is not None else 'N/A'}, Min value half-shifted dose: {np.min(self.half_shifted_dose) if self.half_shifted_dose is not None else 'N/A'}")
+        logger.debug(f"Nominal index: {self.nominal_index}")
 
-    @timed
-    def evaluate(self)->pd.DataFrame:
+    def evaluate(self) -> pd.DataFrame:
         """
         Evaluate scenarios and compute clinical goal values and passing rates.
 
@@ -88,31 +95,68 @@ class ProbabilisticEvaluator:
         """
         if self.sampler.UncertaintyModel.rand_parameters is not None:
             self.blurred_dose = self.blur_dose(self.patientData.doseImage)
+            logger.debug(f"Blurred dose computed for patient {self.patientData.patientID}")
             if self.sampler.enhanced:
                 self.half_shifted_dose = shift_dose_for_enhanced_sampling(self.blurred_dose)
-            
+                logger.debug(f"Half-shifted blurred dose computed for enhanced sampling for patient {self.patientData.patientID}")
+
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
             goal.valueList = np.empty(n_scenarios)
             goal.successList = np.empty(n_scenarios, dtype=bool)
 
-        threads = []
-        for i, scenario in enumerate(self.scenarios):
-            while threading.active_count() > self.nThreads:
-                time.sleep(0.1)
-            print(f"Starting thread for scenario {i+1}/{len(self.scenarios)}")
-            t = threading.Thread(target=self.compute_and_evaluate_scenario, args=(i, scenario))
-            threads.append(t)
-            t.start()
+        file_handler = next((h for h in logger.handlers if isinstance(h, logging.FileHandler)), None)
 
-        for t in threads:
-            t.join()
+        if file_handler is None:
+            # no file handler attached -> nothing to group, just run
+            self._execute_scenario_threads()
+        else:
+            grouped_handler = GroupedMemoryHandler(target_handler=file_handler)
+            logger.removeHandler(file_handler)
+            logger.addHandler(grouped_handler)
+
+            old_hook = threading.excepthook
+            def _thread_exception_hook(args):
+                logger.error(
+                    f"Unhandled exception in thread {args.thread.name}",
+                    exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+                )
+            threading.excepthook = _thread_exception_hook
+
+            try:
+                self._execute_scenario_threads()
+            finally:
+                grouped_handler.flush_grouped()
+                logger.removeHandler(grouped_handler)
+                logger.addHandler(file_handler)
+                threading.excepthook = old_hook
 
         passingRates = self.passingRates()
         cumulativePassingRates = self.cumulativePassingRates() if self.computeCumulativePassingRates else None
         cumulativeRelativePassingRates = self.cumulativeRelativePassingRates() if self.computeCumulativePassingRates else None
         table = self.createPassingRateTable(passingRates, cumulativePassingRates, cumulativeRelativePassingRates)
         return table
+
+    def _execute_scenario_threads(self):
+        """The actual threading loop — shared by grouped and plain paths."""
+        threads = []
+        logger.debug("Entering multithreading evaluation of scenarios.")
+        for i, scenario in enumerate(self.scenarios):
+            while threading.active_count() > self.nThreads:
+                time.sleep(0.1)
+            logger.info(f"Starting thread for scenario {i+1}/{len(self.scenarios)}")
+            t = threading.Thread(
+                target=self.compute_and_evaluate_scenario,
+                args=(i, scenario),
+                name=f"Scenario-{i+1}"
+            )
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+        logger.debug("All threads completed.")
+
 
     def compute_and_evaluate_scenario(self,scenario_idx, scenario):
         """
@@ -133,11 +177,11 @@ class ProbabilisticEvaluator:
         if self.blurred_dose is not None:
             if np.allclose(scenario.displacement % 1, 0, atol=1e-6):
                 scenario.compute_shifted_image(self.blurred_dose, scenario.displacement)
-                print(scenario.displacement, "Using blurred dose for evaluation")
+                logger.debug(f"{scenario.displacement}: Using blurred dose for evaluation")
             elif self.half_shifted_dose is not None:
                 shift = np.array(scenario.displacement) - 0.5
                 scenario.compute_shifted_image(self.half_shifted_dose, shift)
-                print(scenario.displacement, "Using half-shifted blurred dose for evaluation, with corrected shift:", shift)
+                logger.debug(f"{scenario.displacement}: Using half-shifted blurred dose for evaluation, with corrected shift: {shift}")
         
         # Fractionation is not considered, we use the original dose image for evaluation
         else:
@@ -145,6 +189,7 @@ class ProbabilisticEvaluator:
 
         dvh_dict = {}
         for mask in self.patientData.maskDict.keys():
+            logger.debug(f"Evaluating scenario {scenario_idx+1}/{len(self.scenarios)} for mask {mask} with displacement {scenario.displacement} and probability {scenario.probability}.")
             dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
         for goal in self.patientData.probabilisticGoalsList:
             goal.compute(dvh_dict[goal.maskName], scenario_idx=scenario_idx)
@@ -154,7 +199,7 @@ class ProbabilisticEvaluator:
             self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
         scenario.delete_doseImage()
 
-
+    @log_call(log_result=True)
     def computeNominalValues(self):
         """
         Compute nominal values for each clinical goal based on the scenario with displacement closest to [0, 0, 0].
@@ -174,7 +219,7 @@ class ProbabilisticEvaluator:
         dvh_dict = {}
 
         nominal_dose = self.patientData.doseImage
-
+        logger.info(f"Computing nominal values for clincal goals, without dose blurring, using nominal index: {self.nominal_index}")
         # We need to recompute the goals for a non_blured_dose
         if self.blurred_dose is not None:
 
@@ -213,6 +258,7 @@ class ProbabilisticEvaluator:
         list
             A list of passing rates corresponding to each clinical goal.
         """
+        logger.debug(f"Computing passing rates for {len(self.patientData.clinicalGoalsList)} clinical goals.")
         passingRates = []
         for goal in self.patientData.probabilisticGoalsList:
             p = np.sum(self.prob_list[goal.successList])
@@ -231,6 +277,7 @@ class ProbabilisticEvaluator:
 
         """
 
+        logger.debug(f"Computing cumulative passing rates for {len(self.patientData.clinicalGoalsList)} clinical goals.")   
         cumulativeSuccessList = np.ones_like(self.scenarios, dtype=bool)
         cumulativePassingRateList = []
         for goal in self.patientData.probabilisticGoalsList:
@@ -250,7 +297,7 @@ class ProbabilisticEvaluator:
             A list of relative cumulative passing rates corresponding to each clinical goal in order.
 
         """
-
+        logger.debug(f"Computing cumulative relative passing rates for {len(self.patientData.clinicalGoalsList)} clinical goals.")
         cumulativeSuccessList = np.ones_like(self.scenarios, dtype=bool)
         cumulativeRelativePassingRateList = []
         for goal in self.patientData.probabilisticGoalsList:
@@ -260,6 +307,7 @@ class ProbabilisticEvaluator:
 
         return cumulativeRelativePassingRateList
 
+    @log_call(log_result=True)
     def createPassingRateTable(self, passingRates: list,cumulativePassingRates=None,cumulativeRelativePassingRates=None) -> pd.DataFrame:
         """
         Create a DataFrame table summarizing clinical goals, nominal values, passing rates, and cumulative passing rates if computed.
@@ -287,7 +335,7 @@ class ProbabilisticEvaluator:
         headers.append("Success Array")
 
         nominal_value,nominal_success = self.computeNominalValues()
-
+        
         rows = []
         for i, goal in enumerate(self.patientData.clinicalGoalsList):
             if goal.probabilistic:
@@ -358,6 +406,8 @@ class ProbabilisticEvaluator:
         df["Cumulative Relative Passing Rate"] = cum_rel_rates
 
         return df
+    
+    @log_call(log_result=True)
     def blur_dose(self, dosemap: np.ndarray) -> np.ndarray:
         """
         Apply Gaussian blurring to the dose map based on the random setup error parameters.
@@ -389,7 +439,7 @@ class ProbabilisticEvaluator:
         return blurred_dosemap
     
     
-
+    @log_call(log_result=True)
     def createHTMLtable(self, table: pd.DataFrame):
         """
         Create an HTML representation of the passing rate table with color coding for better visualization.
@@ -451,6 +501,7 @@ class ProbabilisticEvaluator:
         html = styler.to_html()
         return html
 
+    @log_call(log_result=True)
     def saveTableToHTML(self,table: pd.DataFrame, filepath: str = "passing_rate_table.html"):
         """
         Save the passing rate table as an HTML file with styling.
@@ -471,6 +522,7 @@ class ProbabilisticEvaluator:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(html)
 
+    @log_call(log_result=True)
     def saveTableToCSV(self, table: pd.DataFrame, filepath: str = "passing_rate_table.csv",save_success_array: bool = True):
         """
         Save the passing rate table as a CSV file.
@@ -492,7 +544,8 @@ class ProbabilisticEvaluator:
             table = table.drop(columns=["Success Array", "Probability Array"])
         table.to_csv(filepath, index=False)
 
-    def saveTableToJSON(self, table: pd.DataFrame, filepath: str = "passing_rate_table.json", save_success_array: bool = True, indent: int = 2):
+    @log_call(log_result=True)
+    def saveTableToJSON(self, table: pd.DataFrame, filepath: str = "passing_rate_table.json"):
         """
         Save passing rate results as a compact but human-readable JSON file.
 
@@ -578,6 +631,7 @@ class ProbabilisticEvaluator:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=indent)
 
+    @log_call(log_result=True)
     def displayVminVmax(self,z_idx=None):
         """
         Display voxel-wise minimum and maximum dose images.
@@ -620,6 +674,7 @@ class ProbabilisticEvaluator:
             plt.title('VWMax - VWMin Dose Distribution (Slice {0})'.format(z_idx))
             plt.show()
     
+    @log_call(log_result=True)
     def displayblurandnominal(self, nominal_dose, blurred_dose, z_idx=None):
         """
         Display the nominal and blurred dose images with CT background,

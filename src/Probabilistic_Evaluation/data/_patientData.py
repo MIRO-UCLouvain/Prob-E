@@ -1,5 +1,5 @@
 import numpy as np
-
+from Probabilistic_Evaluation.logging_utils import logger, log_call
 
 class PatientData:
     """
@@ -41,8 +41,9 @@ class PatientData:
         self.patientID = patientID
         self._spacing = spacing
         self.scenarioList = []
-        # self.prescribedDose = prescribedDose
-
+        self.prescribedDose = prescribedDose
+        logger.info(f"PatientData initialized for patientID: {self.patientID} with prescribed dose: {self.prescribedDose} and masks: {list(maskDict.keys())}")
+        logger.debug(f"Dose image shape: {doseImage.shape}, Spacing: {spacing}, Number of masks: {len(maskDict)} ")
     @property
     def doseImage(self) -> np.ndarray:
         return self._doseImage

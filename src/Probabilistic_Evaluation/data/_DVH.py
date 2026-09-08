@@ -1,6 +1,7 @@
 import numpy as np
 from Probabilistic_Evaluation.utils import linearInterpolator
 from Probabilistic_Evaluation.utils import timed, Timer
+from Probabilistic_Evaluation.logging_utils import log_call, logger
 
 class DVH(object):
     """
@@ -35,7 +36,7 @@ class DVH(object):
         Computes the dose at which x% of the volume receives at least that dose.
     computeVx(x: float) -> float
         Computes the volume percentage receiving at least x Gy dose.
-    """
+    """ 
 
     def __init__(self, dosemap: np.ndarray, mask: np.ndarray, max_DVH: float = 100.0, spacing: tuple = (1.0, 1.0, 1.0)):
         if dosemap.shape != mask.shape:
@@ -57,7 +58,8 @@ class DVH(object):
         self._DMean = None
         self._spacing = spacing
         self.computeDVH_fast()
-
+        logger.debug(f"DVH initialized with dosemap shape {dosemap.shape}, mask shape {mask.shape}, spacing {spacing}.")
+        logger.debug(f"Max: {self.DMax}, Min: {self.DMin}, Mean: {self.DMean}.")
     @property
     def dosemap(self) -> np.ndarray:
         return self._dosemap
@@ -211,7 +213,7 @@ class DVH(object):
         total_volume_cc = np.sum(self.mask) * np.prod(self.spacing) / 1000.0  # convert mm^3 to cc
         if x > total_volume_cc:
             raise ValueError("Absolute volume exceeds total volume of the structure.")
-
+        
         target_percentage = (x / total_volume_cc) * 100.0
 
         dvh_rev = self.dvh[::-1]
@@ -219,6 +221,7 @@ class DVH(object):
         Dcc = linearInterpolator(target_percentage, dvh_rev, dose_rev)
         if Dcc>self.DMax:
             Dcc = self.DMax
+        logger.debug(f"Dose at which {x} cc of the volume receives at least that dose is {Dcc}. Total volume is {total_volume_cc} cc.")
         return Dcc
 
     def computeVcc(self, x: float) -> float:
@@ -240,5 +243,5 @@ class DVH(object):
         volume_percentage = linearInterpolator(x, self.bin_dose, self.dvh)
 
         total_volume_cc = (np.sum(self.mask) * np.prod(self.spacing) / 1000.0)
-
+        logger.debug(f"Absolute volume for dose {x} Gy is {volume_percentage}% of total volume {total_volume_cc} cc.")
         return (volume_percentage / 100.0) * total_volume_cc

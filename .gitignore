@@ -3,6 +3,7 @@
 *.dcm
 *.nii
 *.nii.gz
+*.log
 Examples/*
 Results/*
 demo*

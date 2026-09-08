@@ -18,7 +18,7 @@ class Scenario(object):
 
     def __init__(self, displacement: np.ndarray, probability: float):
         self._displacement: np.ndarray = displacement
-        self._probability: float = probability
+        self._probability: float = probability 
         self._doseImage = None
 
     @property
