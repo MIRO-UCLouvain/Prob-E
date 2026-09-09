@@ -342,7 +342,7 @@ class ProbabilisticEvaluator:
                 row = {
                     "Mask Name": goal.maskName,
                     "Clinical Goal": str(goal),
-                    "Nominal Value": "{:.3f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
+                    "Nominal Value": "{:.4f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
                     "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
                     "Passing Rate": passingRates[i],
                     "Probabilistic Objective": goal.probabilistic
@@ -358,7 +358,7 @@ class ProbabilisticEvaluator:
                 row = {
                     "Mask Name": goal.maskName,
                     "Clinical Goal": str(goal),
-                    "Nominal Value": "{:.3f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
+                    "Nominal Value": "{:.4f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
                     "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
                     "Passing Rate": "N/A",
                     "Probabilistic Objective": goal.probabilistic,
@@ -556,11 +556,6 @@ class ProbabilisticEvaluator:
             cumulative passing rates if computed, and per-goal arrays.
         filepath : str, optional
             The file path where the JSON table will be saved. Default is "passing_rate_table.json".
-        save_success_array : bool, optional
-            Whether to keep the per-goal success array for probabilistic objectives.
-            Default is True.
-        indent : int, optional
-            JSON indentation level for readability. Default is 2.
 
         Returns
         -------
@@ -604,9 +599,6 @@ class ProbabilisticEvaluator:
             cleaned_row = _json_safe(row)
             is_probabilistic = bool(cleaned_row.get("Probabilistic Objective", False))
 
-            if not save_success_array and "Success Array" in cleaned_row:
-                cleaned_row.pop("Success Array", None)
-
             # For non-probabilistic objectives, remove probabilistic metrics.
             if not is_probabilistic:
                 for key in [
@@ -629,7 +621,7 @@ class ProbabilisticEvaluator:
         }
 
         with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=indent)
+            json.dump(payload, f, indent=4)
 
     @log_call(log_result=True)
     def displayVminVmax(self,z_idx=None):

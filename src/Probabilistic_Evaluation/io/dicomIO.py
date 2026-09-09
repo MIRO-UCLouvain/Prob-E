@@ -1,4 +1,3 @@
-from opentps.core.io.dicomIO import *
 from opentps.core.io.dataLoader import *
 from opentps.core.data.images import DoseImage, CTImage
 from opentps.core.data import RTStruct
@@ -74,6 +73,7 @@ class DicomReader():
     
     def readRTDOSE(self):
         # Only return the first DoseImage found
+        print("Reading RTDOSE..., data", self.data)
         for key in self.data:
             if isinstance(key, DoseImage):
                 if self.spacing is None :
