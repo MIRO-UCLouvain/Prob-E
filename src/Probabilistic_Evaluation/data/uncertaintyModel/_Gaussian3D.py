@@ -43,14 +43,14 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
          If provided, this will override the default parameter settings based on marginSize and simulateRandom.
     """
 
-    def __init__(self, marginSize=5, n=500, simulateRandom=False, manual_input = None):
+    def __init__(self, marginSize=5, n=30, simulateRandom=False, manual_input = None):
         super().__init__()
         self.name: str = "Gaussian3DUncertaintyModel"
         self.n_fractions = n
         self.marginSize = marginSize
         self.manual_input = manual_input
         if simulateRandom and manual_input is None:
-            #dose will be blurred, so we need to account for the number of fractions and random errors in the sigma calculation
+            # dose will be blurred, so we need to account for the number of fractions and random errors in the sigma calculation
             # we assume systematic and random sigma are the same
             sigma = marginSize/(2.5*np.sqrt(1+1/n)+0.7)
             self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}

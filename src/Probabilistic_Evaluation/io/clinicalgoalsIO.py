@@ -4,7 +4,7 @@ import numpy as np
 from Probabilistic_Evaluation.data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
 from Probabilistic_Evaluation.data.clinicalGoals import * 
 from Probabilistic_Evaluation.logging_utils import log_call, logger
-from Probabilistic_Evaluation.utils import timed, Timer
+from Probabilistic_Evaluation.utils import timed, Timer, get_partial_volume_mask
 from opentps.core.data.images import CTImage
 
 
@@ -43,7 +43,9 @@ class clinicalgoalsreader():
         self._path = None
         self.clinical_goals_dict: dict = None
         self._clinical_goals_list: list = None
+        self._proba_goals_list: list = None
         self._resampledMasks = {}
+        self._partial_volume_masks = {}
 
     @property
     def maskDict(self) -> dict:
@@ -59,6 +61,14 @@ class clinicalgoalsreader():
     @resampledMasks.setter
     def resampledMasks(self, newResampledMasks: dict):
         self._resampledMasks = newResampledMasks
+
+    @property
+    def partial_volume_masks(self) -> dict:
+        return self._partial_volume_masks
+
+    @partial_volume_masks.setter
+    def partial_volume_masks(self, newPartialVolumeMasks: dict):
+        self._partial_volume_masks = newPartialVolumeMasks
 
     @property
     def path(self) -> str:
@@ -82,34 +92,59 @@ class clinicalgoalsreader():
     def clinical_goals_list(self, newClinicalGoalsList: list):
         self._clinical_goals_list = newClinicalGoalsList
 
+    @property
+    def proba_goals_list(self) -> list:
+        return self._proba_goals_list 
+
     @timed
     def load_JSON_list(self, clinicalgoalpath: str):
         self.path = clinicalgoalpath
-        self._clinical_goals_list = self.load_clinical_goals()
+        self._clinical_goals_list, self._proba_goals_list = self.load_clinical_goals()
         
 
     def load_clinical_goals(self):
         goals_dict_list = self.load_json_list()
         goals_list = []
+        proba_goals_list = []
         for goal in goals_dict_list:
             clinical_goal_obj = self.ClinicalGoalFromDict(goal)
+            if clinical_goal_obj.probabilistic:
+                proba_goals_list.append(clinical_goal_obj)
             goals_list.append(clinical_goal_obj)
         if all(hasattr(goal, "priority") for goal in goals_list):
             goals_list.sort(key=lambda x: x.priority)
+            proba_goals_list.sort(key=lambda x: x.priority)
         
-        return goals_list
+        return goals_list, proba_goals_list
     @log_call(log_result=True)
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
+        import time
+        import numpy as np
         if goal_dict["ROI"] not in self.resampledMasks.keys():
-            maskName=goal_dict["ROI"]
-            mask = self.maskDict[maskName].getBinaryMask(origin=self._origin, gridSize=self._gridSize, spacing=self._spacing).imageArray
+
+            start_time = time.time()
+            maskName=goal_dict["ROI"]            
+            maskPartialVolume = get_partial_volume_mask(
+                contour=self.maskDict[maskName],
+                origin=self._origin,
+                gridSize=self._gridSize,
+                spacing=self._spacing,
+                precision= 16
+            )
+            stop_time = time.time()
+
+            print(f"finished resampling partial volume mask for {goal_dict['ROI']} in {stop_time - start_time:.2f} seconds")
+
+            mask = maskPartialVolume
+            self.partial_volume_masks[maskName] = mask  
             self.resampledMasks[maskName] = mask
             logger.info(f"Resampled mask for ROI: {maskName} with shape: {mask.shape} and spacing: {self._spacing}")
         else: 
             maskName = goal_dict["ROI"]
             mask = self.resampledMasks[maskName]
         
+
         dose =goal_dict["dose"]
         lower_is_better=goal_dict["lower_is_better"]
         priority=goal_dict.get("priority",0)
@@ -137,7 +172,7 @@ class clinicalgoalsreader():
         else:
             raise ValueError(f"Unknown clinical goal type: {goal_dict['type']}")
         if probabilistic:
-            goal.probabilistic(True)
+            goal.probabilistic = True
         logger.debug(f"Creating clinical goal for ROI: {maskName}, type: {type}, number of voxels in mask: {np.sum(mask)}")
         return goal
 

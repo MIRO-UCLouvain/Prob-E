@@ -191,7 +191,7 @@ class ProbabilisticEvaluator:
         for mask in self.patientData.maskDict.keys():
             logger.debug(f"Evaluating scenario {scenario_idx+1}/{len(self.scenarios)} for mask {mask} with displacement {scenario.displacement} and probability {scenario.probability}.")
             dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
-        for goal in self.patientData.clinicalGoalsList:
+        for goal in self.patientData.probabilisticGoalsList:
             goal.compute(dvh_dict[goal.maskName], scenario_idx=scenario_idx)
         if self.computeVWMin:
             self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
@@ -216,13 +216,16 @@ class ProbabilisticEvaluator:
         """
         value_list = []
         success_list = []
+        dvh_dict = {}
+
+        nominal_dose = self.patientData.doseImage
         logger.info(f"Computing nominal values for clincal goals, without dose blurring, using nominal index: {self.nominal_index}")
         # We need to recompute the goals for a non_blured_dose
         if self.blurred_dose is not None:
-            nominal_dose = self.patientData.doseImage
-            dvh_dict = {}
-            for mask in self.patientData.maskDict.keys():
-                dvh_dict[mask] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
+
+            for maskname in self.patientData.maskDict.keys():
+
+                dvh_dict[maskname] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[maskname], spacing=self.patientData.spacing)
             for goal in self.patientData.clinicalGoalsList:
                 value, success = goal.compute(dvh_dict[goal.maskName])
                 value_list.append(value)
@@ -230,11 +233,19 @@ class ProbabilisticEvaluator:
 
         # We can use the nominal index to directly get the values from the goal's valueList
         else:
+            for maskname in self.patientData.maskDict.keys():
+
+                dvh_dict[maskname] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[maskname], spacing=self.patientData.spacing)
             for goal in self.patientData.clinicalGoalsList:
-                value = goal.valueList[self.nominal_index] if self.nominal_index is not None and len(goal.valueList) > self.nominal_index else None
-                value_list.append(value)
-                success = goal.successList[self.nominal_index] if self.nominal_index is not None else None
-                success_list.append(success)
+                if goal.probabilistic:
+                    value = goal.valueList[self.nominal_index] if self.nominal_index is not None and len(goal.valueList) > self.nominal_index else None
+                    value_list.append(value)
+                    success = goal.successList[self.nominal_index] if self.nominal_index is not None else None
+                    success_list.append(success)
+                else:
+                    value, success = goal.compute(dvh_dict[goal.maskName])
+                    value_list.append(value)
+                    success_list.append(success)
 
         return value_list, success_list
 
@@ -249,7 +260,7 @@ class ProbabilisticEvaluator:
         """
         logger.debug(f"Computing passing rates for {len(self.patientData.clinicalGoalsList)} clinical goals.")
         passingRates = []
-        for goal in self.patientData.clinicalGoalsList:
+        for goal in self.patientData.probabilisticGoalsList:
             p = np.sum(self.prob_list[goal.successList])
             passingRates.append(p)
         return passingRates
@@ -269,7 +280,7 @@ class ProbabilisticEvaluator:
         logger.debug(f"Computing cumulative passing rates for {len(self.patientData.clinicalGoalsList)} clinical goals.")   
         cumulativeSuccessList = np.ones_like(self.scenarios, dtype=bool)
         cumulativePassingRateList = []
-        for goal in self.patientData.clinicalGoalsList:
+        for goal in self.patientData.probabilisticGoalsList:
             cumulativeSuccessList = np.logical_and(cumulativeSuccessList, goal.successList)
             cumulativePassingRate = np.sum(self.prob_list[cumulativeSuccessList])
             cumulativePassingRateList.append(cumulativePassingRate)
@@ -289,7 +300,7 @@ class ProbabilisticEvaluator:
         logger.debug(f"Computing cumulative relative passing rates for {len(self.patientData.clinicalGoalsList)} clinical goals.")
         cumulativeSuccessList = np.ones_like(self.scenarios, dtype=bool)
         cumulativeRelativePassingRateList = []
-        for goal in self.patientData.clinicalGoalsList:
+        for goal in self.patientData.probabilisticGoalsList:
             cumulativeSuccessList = np.logical_and(cumulativeSuccessList, goal.successList)
             cumulativeRelativePassingRate = np.sum(self.prob_list[goal.successList])/np.sum(self.prob_list[cumulativeSuccessList]) if np.sum(self.prob_list[cumulativeSuccessList]) > 0 else 0.0
             cumulativeRelativePassingRateList.append(cumulativeRelativePassingRate)
@@ -327,21 +338,32 @@ class ProbabilisticEvaluator:
         
         rows = []
         for i, goal in enumerate(self.patientData.clinicalGoalsList):
-            row = {
-                "Mask Name": goal.maskName,
-                "Clinical Goal": str(goal),
-                "Nominal Value": "{:.3f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
-                "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
-                "Passing Rate": passingRates[i],
-                "Probabilistic Objective": goal.probabilistic
-            }
+            if goal.probabilistic:
+                row = {
+                    "Mask Name": goal.maskName,
+                    "Clinical Goal": str(goal),
+                    "Nominal Value": "{:.4f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
+                    "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
+                    "Passing Rate": passingRates[i],
+                    "Probabilistic Objective": goal.probabilistic
+                }
 
-            if cumulativePassingRates is not None:
-                row["Cumulative Passing Rate"] = cumulativePassingRates[i]
+                if cumulativePassingRates is not None:
+                    row["Cumulative Passing Rate"] = cumulativePassingRates[i]
 
-            if cumulativeRelativePassingRates is not None:
-                row["Cumulative Relative Passing Rate"] = cumulativeRelativePassingRates[i]
-            row["Success Array"] = goal.successList
+                if cumulativeRelativePassingRates is not None:
+                    row["Cumulative Relative Passing Rate"] = cumulativeRelativePassingRates[i]
+                row["Success Array"] = goal.successList
+            else:
+                row = {
+                    "Mask Name": goal.maskName,
+                    "Clinical Goal": str(goal),
+                    "Nominal Value": "{:.4f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
+                    "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
+                    "Passing Rate": "N/A",
+                    "Probabilistic Objective": goal.probabilistic,
+                    "Success Array": "N/A"
+                }
 
             rows.append(row)
 
@@ -411,6 +433,8 @@ class ProbabilisticEvaluator:
         sigma_x = rand_parameters['sigma_x']
         sigma_y = rand_parameters['sigma_y']
         sigma_z = rand_parameters['sigma_z']
+        print(f"Blurring dose map with sigma_x={sigma_x}, sigma_y={sigma_y}, sigma_z={sigma_z}")
+        print(f"Voxel spacing: {self.patientData.spacing}")
         blurred_dosemap = sp.ndimage.gaussian_filter(dosemap, sigma=[sigma_x, sigma_y, sigma_z] / self.patientData.spacing)
         return blurred_dosemap
     
@@ -523,7 +547,7 @@ class ProbabilisticEvaluator:
     @log_call(log_result=True)
     def saveTableToJSON(self, table: pd.DataFrame, filepath: str = "passing_rate_table.json"):
         """
-        Save the passing rate results as a JSON file with top-level metadata.
+        Save passing rate results as a compact but human-readable JSON file.
 
         Parameters
         ----------
@@ -554,13 +578,46 @@ class ProbabilisticEvaluator:
                 return {k: _json_safe(v) for k, v in value.items()}
             return value
 
+        def _is_na(value):
+            if value is None:
+                return True
+            if isinstance(value, str) and value.strip().upper() == "N/A":
+                return True
+            try:
+                return bool(pd.isna(value))
+            except Exception:
+                return False
+
         exported_table = table.copy()
+
+        # Probability array is shared across goals; keep once at top-level only.
+        if "Probability Array" in exported_table.columns:
+            exported_table = exported_table.drop(columns=["Probability Array"])
+
+        table_records = []
+        for row in exported_table.to_dict(orient="records"):
+            cleaned_row = _json_safe(row)
+            is_probabilistic = bool(cleaned_row.get("Probabilistic Objective", False))
+
+            # For non-probabilistic objectives, remove probabilistic metrics.
+            if not is_probabilistic:
+                for key in [
+                    "Success Array",
+                    "Passing Rate",
+                    "Cumulative Passing Rate",
+                    "Cumulative Relative Passing Rate",
+                ]:
+                    cleaned_row.pop(key, None)
+
+            # Drop remaining empty placeholders to keep the JSON compact.
+            cleaned_row = {k: v for k, v in cleaned_row.items() if not _is_na(v)}
+            table_records.append(cleaned_row)
 
         payload = {
             "Probability Mass": float(np.sum(self.prob_list)),
             "Patient ID": self.patientData.patientID,
             "Probability Array": _json_safe(np.array(self.prob_list)),
-            "Table": _json_safe(exported_table.to_dict(orient="records")),
+            "Table": table_records,
         }
 
         with open(filepath, "w", encoding="utf-8") as f:
