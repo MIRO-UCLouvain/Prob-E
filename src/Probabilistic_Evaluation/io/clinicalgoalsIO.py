@@ -1,11 +1,11 @@
 import json
 import numpy as np
+import time
 
 from Probabilistic_Evaluation.data.clinicalGoals._clinicalGoal import AbstractClinicalGoal
 from Probabilistic_Evaluation.data.clinicalGoals import * 
 from Probabilistic_Evaluation.logging_utils import log_call, logger
-from Probabilistic_Evaluation.utils import timed, Timer, get_partial_volume_mask
-from opentps.core.data.images import CTImage
+from Probabilistic_Evaluation.utils import timed, get_partial_volume_mask
 
 
 class clinicalgoalsreader():
@@ -119,8 +119,6 @@ class clinicalgoalsreader():
     @log_call(log_result=True)
     def ClinicalGoalFromDict(self, goal_dict: dict) -> AbstractClinicalGoal:
         #add sufficient checks here
-        import time
-        import numpy as np
         if goal_dict["ROI"] not in self.resampledMasks.keys():
 
             start_time = time.time()

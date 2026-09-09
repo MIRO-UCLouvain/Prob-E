@@ -73,7 +73,6 @@ class DicomReader():
     
     def readRTDOSE(self):
         # Only return the first DoseImage found
-        print("Reading RTDOSE..., data", self.data)
         for key in self.data:
             if isinstance(key, DoseImage):
                 if self.spacing is None :
