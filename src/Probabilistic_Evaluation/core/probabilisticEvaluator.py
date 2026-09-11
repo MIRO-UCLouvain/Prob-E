@@ -192,6 +192,7 @@ class ProbabilisticEvaluator:
             logger.debug(f"Evaluating scenario {scenario_idx+1}/{len(self.scenarios)} for mask {mask} with displacement {scenario.displacement} and probability {scenario.probability}.")
             dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
         for goal in self.patientData.probabilisticGoalsList:
+            logger.debug(f"computing goal {goal} for mask {goal.maskName} for scenario {scenario_idx+1}/{len(self.scenarios)} with displacement {scenario.displacement} and probability {scenario.probability}.")
             goal.compute(dvh_dict[goal.maskName], scenario_idx=scenario_idx)
         if self.computeVWMin:
             self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
