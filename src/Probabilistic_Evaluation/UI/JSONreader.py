@@ -287,8 +287,8 @@ function renderDataset(ds) {
     <div class="section-title">
       Probabilistic objectives
       <span class="section-tools">
-        <button onclick="saveOrder('${ds.file_path}')">Save order</button>
-        <button onclick="loadOrder('${ds.file_path}')">Load order</button>
+        <button class="save-order">Save order</button>
+        <button class="load-order">Load order</button>
       </span>
     </div>
     <div class="table-wrap" id="prob-wrap">
@@ -322,6 +322,12 @@ function renderDataset(ds) {
       </table>
     </div>
   `;
+
+  // Bind through the dataset object: a Windows path pasted into an inline
+  // onclick string would have its backslashes eaten as escape characters,
+  // which made the server write order.txt to the drive root.
+  card.querySelector(".save-order").onclick = () => saveOrder(ds.file_path);
+  card.querySelector(".load-order").onclick = () => loadOrder(ds.file_path);
 
   const probTbody = card.querySelector("#prob-body");
   const nominalTbody = card.querySelector("#nominal-body");
