@@ -33,14 +33,24 @@ def build_payload(results):
     payload = []
 
     def format_nominal(goal: str, raw_value):
+        """Format a nominal value with the unit implied by the goal string.
+
+        Vxcc goals ("V60.0Gy<=3.00cc") evaluate to an absolute volume in cc, Vx goals
+        ("V50.0Gy>=95.00%") to a fraction of the structure volume, every other goal
+        (Dx, Dxcc, Dmean, Dmax, Dmin) to a dose in Gy. Three decimals are kept so that a
+        value just below a threshold is not displayed as equal to it.
+        """
         try:
             value = float(raw_value)
         except (TypeError, ValueError):
             return str(raw_value)
 
+        goal = goal.strip()
+        if goal.endswith("cc"):
+            return f"{value:.3f}cc"
         if goal.startswith("V"):
-            return str(round(value * 100, 2)) + "%"
-        return str(round(value, 2)) + "Gy"
+            return f"{value * 100:.2f}%"
+        return f"{value:.3f}Gy"
 
     for key, obj in results.items():
         data = obj["data"]
