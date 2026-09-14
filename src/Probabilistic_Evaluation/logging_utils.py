@@ -16,7 +16,8 @@ _LOGGER_NAME = "ProbEval"
 logger = logging.getLogger(_LOGGER_NAME)
 
 
-def enable_logging(to_file: bool = False, log_dir: str = ".\\Logs",
+def enable_logging(to_file: bool = False, log_dir: str = os.path.join(os.getcwd(), "Logs"),
+
                     console_output: bool = True,
                     console_level: int = logging.INFO,
                     file_level: int = logging.DEBUG):
