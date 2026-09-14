@@ -40,6 +40,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         self._voronoiProbabilities = None
         self.probabilityMass = probabilityMass
         self.enhanced = enhancedSampling
+        self._spacing = np.asarray(spacing, dtype=float)  # mm per grid step, per axis
         self._computing_method = 'analytical'  # Default computing method
         logger.info(f"Voronoi sampling initialized with total probability mass: {self.probabilityMass}, enhanced sampling grid: {self.enhanced}" )
         self._generateVoronoiSampling(max_displacements, spacing)
@@ -98,15 +99,17 @@ class VoronoiSampling(AbstractsamplingMethod):
         return voronoiPoints
 
     @log_call(log_result=True)
-    def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, num_samples: int = 10000000):
+    def _computeVoronoiProbabilitiesMC(self, voronoiPoints: np.ndarray, spacing: np.ndarray, num_samples: int = 10000000):
         """
         Compute Voronoi cell probabilities using Monte Carlo integration.
 
         Parameters
         ----------
         voronoiPoints : np.ndarray
-            The Voronoi points for which to compute probabilities.
-        num_samples : int (default=100000)
+            The Voronoi points (grid indices) for which to compute probabilities.
+        spacing : np.ndarray
+            The spacing between Voronoi points in mm, per axis.
+        num_samples : int (default=10000000)
             The number of Monte Carlo samples to use.
 
         Returns
@@ -114,10 +117,11 @@ class VoronoiSampling(AbstractsamplingMethod):
         probabilities : np.ndarray
             The computed probabilities for each Voronoi cell.
         """
-        # Generate random samples from the uncertainty model
+        # Generate random samples from the uncertainty model (in mm)
         samples = self.UncertaintyModel.sample(num_samples)
-        # Create a KDTree for efficient nearest neighbor search
-        tree = cKDTree(voronoiPoints)
+        # Create a KDTree for efficient nearest neighbor search; the grid points are indices, so
+        # convert them to mm before comparing them with the samples
+        tree = cKDTree(voronoiPoints * np.asarray(spacing, dtype=float))
         # Find the nearest Voronoi point for each sample
         _, indices = tree.query(samples)
         # Count occurrences in each Voronoi cell
@@ -181,7 +185,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         """
         if self._computing_method == 'montecarlo':
             logger.info(f"Computing Voronoi probabilities via Monte Carlo")
-            return self._computeVoronoiProbabilitiesMC(voronoiPoints)
+            return self._computeVoronoiProbabilitiesMC(voronoiPoints, spacing)
         elif self._computing_method == 'analytical':
             logger.info(f"Computing Voronoi probabilities analytically")
             return self._computeVoronoiProbabilitiesAnalytical(voronoiPoints, spacing)
@@ -271,17 +275,15 @@ class VoronoiSampling(AbstractsamplingMethod):
             raise ValueError("Cumulative probability must be between 0 and 1.")
 
         if self._computing_method == 'montecarlo':
-            #make sure all points at the same distance have the same probability to avoid MC sampling deviations
-            norms = [np.linalg.norm(p) for p in self._voronoiPoints]
-            norms = np.round(norms, decimals=6)#round to avoid floating point errors when comparing norms of points that are very close to each other
-            unique_norms, inverse = np.unique(norms, return_inverse=True)
-            logger.debug(f"Unique displacement norms found: {unique_norms}")
-    
-            # Average the probabilities for Voronoi points with the same norm 
-            for  norm_val in unique_norms:
-                probs_with_same_norm = self._voronoiProbabilities[norms == norm_val]
-                self._voronoiProbabilities[norms == norm_val] = np.average(probs_with_same_norm)
-                logger.debug(f"Average probability for norm {norm_val}: {self._voronoiProbabilities[norms == norm_val][0]}")
+            # Cells that are images of each other under the symmetries of the lattice and of the
+            # uncertainty model have exactly the same probability; average their Monte Carlo estimates
+            # to remove the sampling noise (and to keep whole symmetry classes together when reducing).
+            keys = np.array([self._symmetry_key(p) for p in self._voronoiPoints])
+            unique_keys, inverse = np.unique(keys, axis=0, return_inverse=True)
+            inverse = np.asarray(inverse).ravel()
+            class_mean = np.bincount(inverse, weights=self._voronoiProbabilities) / np.bincount(inverse)
+            self._voronoiProbabilities = class_mean[inverse]
+            logger.debug(f"Averaged Monte Carlo probabilities over {len(unique_keys)} symmetry classes of {len(self._voronoiPoints)} Voronoi points.")
 
         sorted_indices = np.argsort(self._voronoiProbabilities)[::-1]
         sorted_probabilities = self._voronoiProbabilities[sorted_indices]
@@ -301,3 +303,54 @@ class VoronoiSampling(AbstractsamplingMethod):
         # Normalize the reduced probabilities to sum to 1
         #reduced_probabilities /= np.sum(reduced_probabilities)
         return reduced_points, reduced_probabilities
+
+    def _symmetry_key(self, point) -> tuple:
+        """
+        Canonical representative of all lattice points whose Voronoi cells have, by symmetry, the same
+        probability as ``point``.
+
+        A sign flip along an axis is a symmetry when the model mean is zero on that axis (the lattice is
+        symmetric about the origin by construction). Two axes are interchangeable when both have a zero
+        mean, the same grid spacing and the same standard deviation. Points that are not related by one
+        of these operations (e.g. (3,0,0) and (2,2,1), or (1,0,0) and (0,0,1) with different sigma or
+        spacing on x and z) keep separate keys.
+
+        Parameters
+        ----------
+        point : array_like
+            Voronoi point in grid-index units.
+
+        Returns
+        -------
+        tuple
+            Key that is identical for all symmetry-equivalent points.
+        """
+        sys_par = self.UncertaintyModel.sys_parameters or {}
+        axes = ('x', 'y', 'z')
+        mu = np.array([float(sys_par.get(f'mu_{a}', 0.0)) for a in axes])
+        sigma = [sys_par.get(f'sigma_{a}', None) for a in axes]
+        zero_mean = np.isclose(mu, 0.0)
+
+        coords = np.asarray(point, dtype=float)
+        key = np.where(zero_mean, np.abs(coords), coords)
+
+        visited = [False, False, False]
+        for i in range(3):
+            if visited[i]:
+                continue
+            group = [i]
+            visited[i] = True
+            for j in range(i + 1, 3):
+                if visited[j]:
+                    continue
+                interchangeable = (
+                    zero_mean[i] and zero_mean[j]
+                    and np.isclose(self._spacing[i], self._spacing[j])
+                    and sigma[i] is not None and sigma[j] is not None
+                    and np.isclose(float(sigma[i]), float(sigma[j]))
+                )
+                if interchangeable:
+                    group.append(j)
+                    visited[j] = True
+            key[group] = np.sort(key[group])
+        return tuple(np.round(key, 6))
