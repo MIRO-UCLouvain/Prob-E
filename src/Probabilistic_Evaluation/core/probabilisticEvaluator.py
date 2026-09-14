@@ -9,7 +9,7 @@ import os
 import logging
 import threading
 import multiprocessing
-import time
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pandas as pd
 import scipy as sp
@@ -60,6 +60,7 @@ class ProbabilisticEvaluator:
 
         self.VWMin = None
         self.VWMax = None
+        self._vw_lock = threading.Lock()  # VWMin/VWMax are updated from several scenario threads
 
         self.blurred_dose = None
         self.half_shifted_dose = None  # Store the shifted+blurred dose for evaluation when using enhanced sampling
@@ -74,7 +75,7 @@ class ProbabilisticEvaluator:
 
         nThreads = kwargs.get('nThreads', -1)
         if nThreads < 1:
-            self.nThreads = multiprocessing.cpu_count()-1
+            self.nThreads = max(1, multiprocessing.cpu_count()-1)  # the thread pool needs at least one worker
         else:
             self.nThreads = nThreads
         logger.info(f"ProbabilisticEvaluator initialized with {len(self.scenarios)} scenarios, using {self.nThreads} threads.")
@@ -102,8 +103,9 @@ class ProbabilisticEvaluator:
 
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
-            goal.valueList = np.empty(n_scenarios)
-            goal.successList = np.empty(n_scenarios, dtype=bool)
+            # NaN / False until a scenario has actually been evaluated (never uninitialised memory)
+            goal.valueList = np.full(n_scenarios, np.nan)
+            goal.successList = np.zeros(n_scenarios, dtype=bool)
 
         file_handler = next((h for h in logger.handlers if isinstance(h, logging.FileHandler)), None)
 
@@ -115,21 +117,12 @@ class ProbabilisticEvaluator:
             logger.removeHandler(file_handler)
             logger.addHandler(grouped_handler)
 
-            old_hook = threading.excepthook
-            def _thread_exception_hook(args):
-                logger.error(
-                    f"Unhandled exception in thread {args.thread.name}",
-                    exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
-                )
-            threading.excepthook = _thread_exception_hook
-
             try:
                 self._execute_scenario_threads()
             finally:
                 grouped_handler.flush_grouped()
                 logger.removeHandler(grouped_handler)
                 logger.addHandler(file_handler)
-                threading.excepthook = old_hook
 
         passingRates = self.passingRates()
         cumulativePassingRates = self.cumulativePassingRates() if self.computeCumulativePassingRates else None
@@ -138,23 +131,35 @@ class ProbabilisticEvaluator:
         return table
 
     def _execute_scenario_threads(self):
-        """The actual threading loop — shared by grouped and plain paths."""
-        threads = []
-        logger.debug("Entering multithreading evaluation of scenarios.")
-        for i, scenario in enumerate(self.scenarios):
-            while threading.active_count() > self.nThreads:
-                time.sleep(0.1)
-            logger.info(f"Starting thread for scenario {i+1}/{len(self.scenarios)}")
-            t = threading.Thread(
-                target=self.compute_and_evaluate_scenario,
-                args=(i, scenario),
-                name=f"Scenario-{i+1}"
-            )
-            threads.append(t)
-            t.start()
+        """
+        Evaluate all scenarios in a thread pool (shared by the grouped and plain logging paths).
 
-        for t in threads:
-            t.join()
+        Every worker exception is logged and, once all scenarios have finished, re-raised as a
+        RuntimeError naming the failed scenarios, so that a failed scenario can never end up in the
+        passing rates.
+        """
+        logger.debug("Entering multithreading evaluation of scenarios.")
+        failures = []
+        with ThreadPoolExecutor(max_workers=self.nThreads, thread_name_prefix="Scenario") as executor:
+            futures = {
+                executor.submit(self.compute_and_evaluate_scenario, i, scenario): i
+                for i, scenario in enumerate(self.scenarios)
+            }
+            for future, i in futures.items():
+                try:
+                    future.result()
+                except Exception as exc:
+                    logger.error(
+                        f"Scenario {i+1}/{len(self.scenarios)} (displacement {self.scenarios[i].displacement}) failed",
+                        exc_info=exc,
+                    )
+                    failures.append((i, exc))
+        if failures:
+            failed_ids = ", ".join(str(i + 1) for i, _ in failures)
+            raise RuntimeError(
+                f"{len(failures)} of {len(self.scenarios)} scenarios failed during evaluation "
+                f"(scenario {failed_ids}); see the log for the tracebacks."
+            ) from failures[0][1]
         logger.debug("All threads completed.")
 
 
@@ -174,6 +179,9 @@ class ProbabilisticEvaluator:
         None
 
         """
+        # name the pool thread after the scenario so that the grouped log stays readable per scenario
+        threading.current_thread().name = f"Scenario-{scenario_idx+1}"
+        logger.info(f"Starting evaluation of scenario {scenario_idx+1}/{len(self.scenarios)}")
         if self.blurred_dose is not None:
             if np.allclose(scenario.displacement % 1, 0, atol=1e-6):
                 scenario.compute_shifted_image(self.blurred_dose, scenario.displacement)
@@ -194,10 +202,13 @@ class ProbabilisticEvaluator:
         for goal in self.patientData.probabilisticGoalsList:
             logger.debug(f"computing goal {goal} for mask {goal.maskName} for scenario {scenario_idx+1}/{len(self.scenarios)} with displacement {scenario.displacement} and probability {scenario.probability}.")
             goal.compute(dvh_dict[goal.maskName], scenario_idx=scenario_idx)
-        if self.computeVWMin:
-            self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
-        if self.computeVWMax:
-            self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
+        if self.computeVWMin or self.computeVWMax:
+            # read-modify-write on shared arrays: serialise across scenario threads
+            with self._vw_lock:
+                if self.computeVWMin:
+                    self.VWMin = np.minimum(self.VWMin, scenario.doseImage)
+                if self.computeVWMax:
+                    self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
         scenario.delete_doseImage()
 
     @log_call(log_result=True)
@@ -336,30 +347,40 @@ class ProbabilisticEvaluator:
         headers.append("Success Array")
 
         nominal_value,nominal_success = self.computeNominalValues()
-        
+
+        # The rates were computed by iterating over probabilisticGoalsList; look them up by goal identity
+        # instead of by position in clinicalGoalsList, which also holds the non-probabilistic goals.
+        rate_index = {id(goal): k for k, goal in enumerate(self.patientData.probabilisticGoalsList)}
+
         rows = []
         for i, goal in enumerate(self.patientData.clinicalGoalsList):
             if goal.probabilistic:
+                k = rate_index.get(id(goal))
+                if k is None:
+                    raise ValueError(
+                        f"Clinical goal {goal} ({goal.maskName}) is flagged probabilistic but is not part of "
+                        "patientData.probabilisticGoalsList; assign clinicalGoalsList after setting the flag."
+                    )
                 row = {
                     "Mask Name": goal.maskName,
                     "Clinical Goal": str(goal),
-                    "Nominal Value": "{:.4f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
+                    "Nominal Value": float(nominal_value[i]) if nominal_value[i] is not None else "N/A",
                     "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
-                    "Passing Rate": passingRates[i],
+                    "Passing Rate": passingRates[k],
                     "Probabilistic Objective": goal.probabilistic
                 }
 
                 if cumulativePassingRates is not None:
-                    row["Cumulative Passing Rate"] = cumulativePassingRates[i]
+                    row["Cumulative Passing Rate"] = cumulativePassingRates[k]
 
                 if cumulativeRelativePassingRates is not None:
-                    row["Cumulative Relative Passing Rate"] = cumulativeRelativePassingRates[i]
+                    row["Cumulative Relative Passing Rate"] = cumulativeRelativePassingRates[k]
                 row["Success Array"] = goal.successList
             else:
                 row = {
                     "Mask Name": goal.maskName,
                     "Clinical Goal": str(goal),
-                    "Nominal Value": "{:.4f}".format(nominal_value[i]) if nominal_value[i] is not None else "N/A",
+                    "Nominal Value": float(nominal_value[i]) if nominal_value[i] is not None else "N/A",
                     "Nominal Success": nominal_success[i] if nominal_success[i] is not None else "N/A",
                     "Passing Rate": "N/A",
                     "Probabilistic Objective": goal.probabilistic,
@@ -482,11 +503,15 @@ class ProbabilisticEvaluator:
 
             return styles
 
+        formats = {col: "{:.1%}" for col in passing_cols}
+        # nominal values are numeric in the table (strings such as "N/A" are passed through)
+        formats["Nominal Value"] = lambda v: f"{v:.4f}" if isinstance(v, (float, int, np.floating, np.integer)) else v
+
         styler = (
             table.style
             .apply(nominal_color, axis=1)
             .background_gradient(cmap="RdYlGn", subset=passing_cols, vmin=0, vmax=1)
-            .format({col: "{:.1%}" for col in passing_cols})
+            .format(formats)
             .set_table_styles([
                 {
                     "selector": "th",
