@@ -25,24 +25,3 @@ class DoseImage:
         self.origin = np.asarray(origin, dtype=float)
         self.gridSize = np.asarray(gridSize, dtype=int)
         self.seriesInstanceUID = seriesInstanceUID
-
-    def resample(self, newSpacing, newGridSize, newOrigin):
-        """
-        Resample the dose image in place onto a new grid.
-
-        Parameters
-        ----------
-        newSpacing : array-like
-            Target voxel spacing (x, y, z).
-        newGridSize : array-like
-            Target grid size (x, y, z).
-        newOrigin : array-like
-            Target origin (x, y, z).
-        """
-        from scipy.ndimage import zoom
-
-        zoomFactors = np.asarray(newGridSize, dtype=float) / np.asarray(self.imageArray.shape, dtype=float)
-        self.imageArray = zoom(self.imageArray, zoomFactors, order=1)
-        self.spacing = np.asarray(newSpacing, dtype=float)
-        self.gridSize = np.asarray(newGridSize, dtype=int)
-        self.origin = np.asarray(newOrigin, dtype=float)

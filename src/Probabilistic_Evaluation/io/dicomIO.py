@@ -4,7 +4,7 @@ from typing import List
 import numpy as np
 import pydicom
 
-from Probabilistic_Evaluation.utils import timed, Timer
+from Probabilistic_Evaluation.utils import timed, Timer, resample_image
 from Probabilistic_Evaluation.logging_utils import log_call, logger
 from Probabilistic_Evaluation.data import CTImage, DoseImage, ROIContour, RTStruct
 
@@ -80,7 +80,11 @@ class DicomReader():
                     newGridSize = (int(key.gridSize[0] * key.spacing[0] / self.spacing[0]),
                                    int(key.gridSize[1] * key.spacing[1] / self.spacing[1]),
                                    int(key.gridSize[2] * key.spacing[2] / self.spacing[2]))
-                    key.resample(self.spacing,newGridSize,key.origin)
+                    key.imageArray = resample_image(
+                        key.imageArray, key.spacing, key.origin, self.spacing, newGridSize, key.origin
+                    )
+                    key.spacing = np.asarray(self.spacing, dtype=float)
+                    key.gridSize = np.asarray(newGridSize, dtype=int)
                     self.gridSize = newGridSize
 
                 RTdose = key.imageArray

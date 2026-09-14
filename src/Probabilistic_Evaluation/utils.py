@@ -5,7 +5,7 @@ import warnings
 from functools import wraps
 
 from skimage.draw import polygon2mask
-from scipy.ndimage import shift
+from scipy.ndimage import shift, gaussian_filter, map_coordinates
 
 from Probabilistic_Evaluation.logging_utils import log_call, logger
 
@@ -38,6 +38,69 @@ def shift_dose_for_enhanced_sampling(doseImage):
         logger.debug(f"Shifting dose image for enhanced sampling by {shift_vec} voxels.")
         half_shifted_dose = shift(doseImage, shift=shift_vec, order=1, mode='constant' )  
         return half_shifted_dose
+
+
+def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrigin, antialias=True):
+    """
+    Resample a 3D image (x, y, z) onto a new grid.
+
+    Every target voxel centre is mapped to its fractional index in the current
+    grid and the image is interpolated there (trilinear). Both ``origin`` and
+    ``newOrigin`` are the coordinates of the centre of the first voxel (DICOM
+    ImagePositionPatient convention), so target centres lie at
+    ``newOrigin + i * newSpacing`` and current centres at ``origin + j * spacing``.
+    Target voxels that fall outside the current grid take the value of the
+    nearest edge voxel.
+
+    Along axes where the target spacing is coarser than the current one, point
+    sampling would alias the gradients. With ``antialias`` the image is first
+    low-pass filtered along those axes with a Gaussian of standard deviation
+    ``(ratio - 1) / 2`` current voxels, where ``ratio`` is the downsampling
+    factor (the same rule scikit-image uses). Axes that are upsampled or
+    unchanged are not filtered.
+
+    Parameters
+    ----------
+    imageArray : np.ndarray
+        3D image with axis order (x, y, z).
+    spacing : array-like
+        Current voxel spacing in mm (x, y, z).
+    origin : array-like
+        Current coordinates in mm of the centre of the first voxel (x, y, z).
+    newSpacing : array-like
+        Target voxel spacing in mm (x, y, z).
+    newGridSize : array-like
+        Target number of voxels (x, y, z).
+    newOrigin : array-like
+        Target coordinates in mm of the centre of the first voxel (x, y, z).
+    antialias : bool, optional
+        Low-pass filter before downsampling. Default True.
+
+    Returns
+    -------
+    np.ndarray
+        Resampled image of shape ``newGridSize`` and the same dtype as ``imageArray``.
+    """
+    spacing = np.asarray(spacing, dtype=float)
+    origin = np.asarray(origin, dtype=float)
+    newSpacing = np.asarray(newSpacing, dtype=float)
+    newGridSize = np.asarray(newGridSize, dtype=int)
+    newOrigin = np.asarray(newOrigin, dtype=float)
+
+    image = imageArray
+    ratio = newSpacing / spacing
+    if antialias and np.any(ratio > 1):
+        sigma = np.where(ratio > 1, (ratio - 1) / 2, 0.0)
+        image = gaussian_filter(image, sigma=sigma, mode="nearest")
+
+    # Fractional index in the current grid of every target voxel centre, per axis
+    axes = [
+        ((newOrigin[a] + np.arange(newGridSize[a]) * newSpacing[a] - origin[a]) / spacing[a]).astype(np.float32)
+        for a in range(3)
+    ]
+    coords = np.meshgrid(*axes, indexing="ij")
+
+    return map_coordinates(image, coords, order=1, mode="nearest").astype(imageArray.dtype, copy=False)
 
 
 def linearInterpolator(x: float, x_array: np.ndarray, y_array: np.ndarray) -> float:
