@@ -100,8 +100,8 @@ class DVH(object):
     @property
     def DMean(self) -> float:
         if self._DMean is None:
-            
-            self._DMean = np.sum(self.dosemap[self.mask>0]*self.mask[self.mask>0]) / np.sum(self.mask[self.mask>0])
+        
+            self._DMean = np.average(self.dosemap[self.mask>0], weights=self.mask[self.mask>0])
             
         return self._DMean
 
