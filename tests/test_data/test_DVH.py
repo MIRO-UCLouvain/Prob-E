@@ -165,5 +165,9 @@ def test_dvh_invalid_Dcc_Vcc(easy_dvh):
         dvh.computeDcc(-10)
     with pytest.raises(ValueError):
         dvh.computeVcc(-5)
-    with pytest.raises(ValueError):
-        dvh.computeDcc(2000)
+
+
+def test_dvh_Dcc_beyond_structure_volume_returns_Dmin(easy_dvh):
+    # a volume larger than the structure cannot be reached: the dose to "at least that volume" is Dmin
+    dvh = easy_dvh
+    assert dvh.computeDcc(2000) == dvh.DMin
