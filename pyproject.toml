@@ -19,6 +19,7 @@ dependencies = [
     "pydicom>=2.4",
     "pandas>=2.0.3,<3.0",
     "matplotlib>=3.7.1,<4.0",
+    "scikit-image>=0.21,<1.0",
 ]
 
 [project.optional-dependencies]
@@ -36,4 +37,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # makes <repo>/streamlit_app importable in tests
 python_files = ["test_*.py"]
