@@ -500,9 +500,15 @@ def edit_clinical_goals(json_path: str | Path) -> bool:
             sys.executable, "-m", "streamlit", "run", str(Path(__file__).resolve()),
             "--server.port", str(_free_port()),
             "--server.address", "127.0.0.1",
+            # Streamlit asks for an e-mail address in the terminal the first time it runs on a
+            # machine and waits for the answer; without a console (IDE, double-click) it never
+            # gets one and the server dies before the editor opens.  Disable the prompt.
+            "--server.showEmailPrompt", "false",
+            "--browser.gatherUsageStats", "false",
             "--", str(path.resolve()), str(state_file),
         ]
-        proc = subprocess.Popen(cmd, env=env)
+        # no stdin: the server must never wait for keyboard input
+        proc = subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL)
         started = time.time()
         try:
             while proc.poll() is None:
@@ -526,9 +532,17 @@ def edit_clinical_goals(json_path: str | Path) -> bool:
                 except subprocess.TimeoutExpired:
                     proc.kill()
         try:
-            return bool(json.loads(state_file.read_text(encoding="utf-8")).get("saved", False))
+            state = json.loads(state_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            return False
+            state = {}
+        if not state.get("closed") and state.get("alive") is None:
+            # the server stopped (or never answered) before a browser connected: say so
+            # instead of silently returning as if the user had closed the editor
+            raise RuntimeError(
+                f"The clinical goals editor did not start (Streamlit exited with code {proc.returncode}); "
+                "see the messages printed above by: " + " ".join(cmd)
+            )
+        return bool(state.get("saved", False))
 
 
 def _inside_streamlit() -> bool:
