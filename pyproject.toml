@@ -7,7 +7,7 @@ name = "rt-probabilistic-evaluation"
 version = "0.1.0"
 description = "A package for probabilistic evaluation in radiation therapy"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 authors = [
   { name = "Matijs Geerts" },
   { name = "Romain Schyns" },
