@@ -191,6 +191,27 @@ def test_between_contour_slices_are_distance_weighted():
     assert np.allclose(area[k0 : k1 + 1], expected, atol=0.05)
 
 
+# ----------------------------------------------------------------------------- mask / dose grid alignment
+@pytest.mark.parametrize("spacing", [(0.5, 0.5, 0.5), (1.0, 1.0, 1.0), (2.0, 2.0, 2.0), (3.0, 3.0, 3.0), (2.0, 2.0, 1.0)])
+def test_partial_volume_mask_stays_on_the_contours_for_any_spacing(spacing):
+    """Masks use the grid origin as the centre of the first voxel (RayStation Corner + spacing/2), without a further shift.
+
+    The rasterizer used to add 0.5 * (1 - spacing) mm in-plane, which moved the masks off the dose for any spacing but 1 mm.
+    """
+    spacing = np.asarray(spacing, dtype=float)
+    size, origin = resampling_grid([60, 60, 40], [1.0, 1.0, 1.0], [-30.0, -30.0, -20.0], spacing)  # as the DICOM reader builds it
+    offsets = []
+    for k in range(8):  # sub-voxel box positions, so that the partial-volume quantization averages out
+        cx, cy = 0.37 + k * spacing[0] / 8, -0.61 + k * spacing[1] / 8
+        box = [np.array([cx - 8.3, cy - 5.7, z, cx + 8.3, cy - 5.7, z, cx + 8.3, cy + 5.7, z, cx - 8.3, cy + 5.7, z]) for z in np.arange(-8.0, 8.5, 1.0)]
+        mask = get_partial_volume_mask(ROIContour("box", box), origin, size, spacing, precision=16).astype(np.float64)
+        index = np.indices(mask.shape).reshape(3, -1)
+        centroid = origin + (index * mask.ravel()).sum(axis=1) / mask.sum() * spacing
+        offsets.append(centroid[:2] - [cx, cy])
+    # partial-volume quantization scales with the voxel size; the old offset was 5 to 10 times this tolerance
+    assert np.allclose(np.mean(offsets, axis=0), 0.0, atol=0.05 * spacing[0])
+
+
 # ----------------------------------------------------------------------------- M14 / H6
 def test_resampling_grid_keeps_the_voxel_edge_extent():
     size, origin = resampling_grid([100, 8, 8], [2.5, 1.0, 1.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0])
@@ -239,4 +260,4 @@ def test_viewer_formats_nominal_values_with_the_goal_unit():
     ]
     payload = build_payload({"x": {"data": {"Probability Array": [1.0], "Probability Mass": 1.0, "Table": table}, "path": Path("x.json")}})
     shown = [row["nominal"] for row in payload[0]["nominal_rows"]]
-    assert shown == ["0.42cc", "50.40Gy", "97.12%", "N/A"]
+    assert shown == ["0.42cc", "50.40Gy", "97.12%", "N/A"]  # two decimals, unit from the goal
