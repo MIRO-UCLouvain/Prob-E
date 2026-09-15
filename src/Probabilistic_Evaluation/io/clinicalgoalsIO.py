@@ -45,8 +45,7 @@ class clinicalgoalsreader():
         self._clinical_goals_list: list = None
         self._proba_goals_list: list = None
         self._resampledMasks = {}
-        self._partial_volume_masks = {}
-
+     
     @property
     def maskDict(self) -> dict:
         return self._maskDict
@@ -61,14 +60,6 @@ class clinicalgoalsreader():
     @resampledMasks.setter
     def resampledMasks(self, newResampledMasks: dict):
         self._resampledMasks = newResampledMasks
-
-    @property
-    def partial_volume_masks(self) -> dict:
-        return self._partial_volume_masks
-
-    @partial_volume_masks.setter
-    def partial_volume_masks(self, newPartialVolumeMasks: dict):
-        self._partial_volume_masks = newPartialVolumeMasks
 
     @property
     def path(self) -> str:
@@ -133,9 +124,7 @@ class clinicalgoalsreader():
             stop_time = time.time()
 
             print(f"finished resampling partial volume mask for {goal_dict['ROI']} in {stop_time - start_time:.2f} seconds")
-
             mask = maskPartialVolume
-            self.partial_volume_masks[maskName] = mask  
             self.resampledMasks[maskName] = mask
             logger.info(f"Resampled mask for ROI: {maskName} with shape: {mask.shape} and spacing: {self._spacing}")
         else: 
