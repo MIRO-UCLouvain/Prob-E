@@ -196,7 +196,8 @@ class ProbabilisticEvaluator:
             scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
 
         dvh_dict = {}
-        for mask in self.patientData.maskDict.keys():
+        # only the ROIs of the probabilistic goals are needed here, not every mask in patientData
+        for mask in dict.fromkeys(goal.maskName for goal in self.patientData.probabilisticGoalsList):
             logger.debug(f"Evaluating scenario {scenario_idx+1}/{len(self.scenarios)} for mask {mask} with displacement {scenario.displacement} and probability {scenario.probability}.")
             dvh_dict[mask] = DVH(dosemap=scenario.doseImage, mask=self.patientData.maskDict[mask], spacing=self.patientData.spacing)
         for goal in self.patientData.probabilisticGoalsList:
@@ -235,7 +236,7 @@ class ProbabilisticEvaluator:
         # We need to recompute the goals for a non_blured_dose
         if self.blurred_dose is not None:
 
-            for maskname in self.patientData.maskDict.keys():
+            for maskname in dict.fromkeys(goal.maskName for goal in self.patientData.clinicalGoalsList):
 
                 dvh_dict[maskname] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[maskname], spacing=self.patientData.spacing)
             for goal in self.patientData.clinicalGoalsList:
@@ -245,7 +246,7 @@ class ProbabilisticEvaluator:
 
         # We can use the nominal index to directly get the values from the goal's valueList
         else:
-            for maskname in self.patientData.maskDict.keys():
+            for maskname in dict.fromkeys(goal.maskName for goal in self.patientData.clinicalGoalsList):
 
                 dvh_dict[maskname] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[maskname], spacing=self.patientData.spacing)
             for goal in self.patientData.clinicalGoalsList:
