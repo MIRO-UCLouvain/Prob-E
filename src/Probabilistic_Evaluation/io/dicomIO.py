@@ -1,22 +1,34 @@
 import os
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import List
 
 import numpy as np
 import pydicom
+from pydicom.errors import InvalidDicomError
 
 from Probabilistic_Evaluation.utils import timed, Timer, resample_image, resampling_grid
 from Probabilistic_Evaluation.logging_utils import log_call, logger
 from Probabilistic_Evaluation.data import CTImage, DoseImage, ROIContour, RTStruct
+
+_CT_SOP_CLASS = "1.2.840.10008.5.1.4.1.1.2"
+_RTDOSE_SOP_CLASS = "1.2.840.10008.5.1.4.1.1.481.2"
+_RTSTRUCT_SOP_CLASS = "1.2.840.10008.5.1.4.1.1.481.3"
+_RTPLAN_SOP_CLASSES = ("1.2.840.10008.5.1.4.1.1.481.5", "1.2.840.10008.5.1.4.1.1.481.8")
+# modalities that often share a patient folder but are not used here: skipped without a warning
+_IGNORED_MODALITIES = ("MR", "REG")
+# the only tags read while scanning a folder; pixel data and all other elements are skipped
+_HEADER_TAGS = ["SOPClassUID", "Modality", "SeriesInstanceUID"]
 
 
 class DicomReader():
     """
     A class to read and process DICOM files including CT images, RTSTRUCT, and RTDOSE.
 
+    The directory is scanned once, reading only the DICOM headers, and the RTDOSE and RTSTRUCT to use are
+    selected before any image data is read. The CT is only read when ``loadCT`` is True.
+
     Attributes
     ----------
-    CT : np.ndarray
-        The CT image data as a 3D numpy array.
     RTSTRUCT : dict
         A dictionary containing the RTSTRUCT data, with structure names as keys and contour data as values
     RTDOSE : np.ndarray
@@ -24,12 +36,15 @@ class DicomReader():
     spacing : tuple
         The voxel spacing for the CT image, typically in the format (x_spacing, y_spacing, z_spacing).
     data : list
-        A list to store the raw DICOM data loaded from the specified directory.
-    CTImage : CTImage
-        An instance of the CTImage class defined above, representing the CT image and its associated metadata.
+        The data objects loaded from the specified directory: the selected DoseImage and RTStruct, followed by
+        one CTImage per CT series when ``loadCT`` is True.
+    loadCT : bool
+        Whether the CT series are read. The evaluation only needs the dose and the structures. Default False.
+    nThreads : int
+        Number of threads reading the DICOM headers while scanning the directory. Default 16.
     """
 
-    def __init__(self, spacing=None):
+    def __init__(self, spacing=None, loadCT=True, nThreads=-1):
         self.RTSTRUCT: dict = None
         self.RTDOSE: np.ndarray = None
         self.spacing: tuple = spacing
@@ -37,26 +52,47 @@ class DicomReader():
         self.gridSize: tuple = None
         self.patientID = None
         self.data = None
+        self.loadCT = loadCT
+        self.nThreads = nThreads
 
     @timed
-    def load_dicom_series(self,directory):
+    def load_dicom_series(self, directory, doseFile=None, structFile=None):
         """
-        Load a DICOM series from the specified directory.
+        Load the RTDOSE, the RTSTRUCT and, with ``loadCT``, the CT series from the specified directory.
 
         Parameters
         ----------
         directory : str
-            The path to the directory containing the DICOM files.
+            The path to the directory containing the DICOM files. Subfolders are searched too.
+        doseFile : str, optional
+            Path or file name of the RTDOSE to load. Required when the directory holds more than one RTDOSE.
+        structFile : str, optional
+            Path or file name of the RTSTRUCT to load. Required when the directory holds more than one RTSTRUCT.
 
         Returns
         -------
             None
+
+        Raises
+        ------
+        ValueError
+            If no RTDOSE or RTSTRUCT is found, if several are found and none is selected, or if the selection
+            does not match exactly one file. Raised after the header scan, before any image data is read.
         """
-        self.data = readData(directory)
+        dicomFiles = scanDicomFiles(directory, nThreads=self.nThreads)
+        dosePath = _selectFile(dicomFiles["RTDOSE"], doseFile, "RTDOSE", "doseFile")
+        structPath = _selectFile(dicomFiles["RTSTRUCT"], structFile, "RTSTRUCT", "structFile")
+        logger.info(f"Loading RTDOSE {dosePath} and RTSTRUCT {structPath}")
+
+        self.data = [readDicomDose(dosePath), readDicomStruct(structPath)]
+        if self.loadCT:
+            self.data += [readDicomCT(ctFiles) for ctFiles in dicomFiles["CT"].values()]
         self.RTDOSE = self.readRTDOSE()
         self.RTSTRUCT = self.readRTSTRUCT()
 
     def readCT(self):
+        if not self.loadCT:
+            raise ValueError("The CT was not loaded, create the DicomReader with loadCT=True to read it.")
         for key in self.data:
             if isinstance(key, CTImage):
                 CT = key.imageArray
@@ -68,7 +104,7 @@ class DicomReader():
                 logger.debug(f"CT Image origin: {origin}, Grid Size: {gridSize}")
                 return CT, spacing, origin, gridSize
         raise ValueError("No CTImage found in the provided DICOM series.")
-    
+
     def readRTDOSE(self):
         # Only return the first DoseImage found
         for key in self.data:
@@ -97,7 +133,7 @@ class DicomReader():
                 return RTdose
         raise ValueError("No DoseImage found in the provided DICOM series.")
 
-    
+
     def readRTSTRUCT(self):
         RTstruct_dictionary = {}
         for key in self.data:
@@ -107,15 +143,37 @@ class DicomReader():
                 for contour in RTstruct._contours:
                     logger.info(f"Structure: {contour.name}")
                     RTstruct_dictionary[contour.name] = contour
-                    
+
                 return RTstruct_dictionary
         raise ValueError("No RTStruct found in the provided DICOM series.")
 
 
-
-def readData(inputPaths, maxDepth=-1) -> List[object]:
+def _selectFile(filePaths, requested, label, argumentName):
     """
-    Load all data found at the given input path, using pydicom to parse DICOM files.
+    Return the one file of a type to load, or raise before any image data is read.
+
+    ``requested`` is matched against the full path or the file name of each candidate.
+    """
+    names = ", ".join(os.path.basename(filePath) for filePath in filePaths)
+    if requested is not None:
+        target = os.path.normcase(os.path.abspath(requested))
+        matches = [
+            filePath for filePath in filePaths
+            if os.path.basename(filePath) == requested or os.path.normcase(os.path.abspath(filePath)) == target
+        ]
+        if len(matches) != 1:
+            raise ValueError(f"{argumentName}={requested!r} matches {len(matches)} of the {label} files found: [{names}].")
+        return matches[0]
+    if not filePaths:
+        raise ValueError(f"No {label} found in the provided DICOM series.")
+    if len(filePaths) > 1:
+        raise ValueError(f"Found {len(filePaths)} {label} files, pass {argumentName}= to choose one: [{names}].")
+    return filePaths[0]
+
+
+def readData(inputPaths, maxDepth=-1, nThreads=16) -> List[object]:
+    """
+    Load all DICOM CT, RTDOSE, RTPLAN and RTSTRUCT data found at the given input path.
 
     Parameters
     ----------
@@ -126,79 +184,131 @@ def readData(inputPaths, maxDepth=-1) -> List[object]:
         Maximum subfolder depth where the function will check for data to be loaded.
         Default is -1, which implies recursive search over infinite subfolder depth.
 
+    nThreads: int, optional
+        Number of threads reading the DICOM headers. Default 16.
+
     Returns
     -------
     dataList: list of data objects
         The function returns a list of data objects containing the imported data.
 
     """
-
-    fileLists = listAllFiles(inputPaths, maxDepth=maxDepth)
-    dataList = []
-
-    # read Dicom files
-    dicomCT = {}
-
-    for d, filePath in enumerate(fileLists["Dicom"]):
-        logger.info(f'Loading data {d+1}/{len(fileLists["Dicom"])} Dicom files : {os.path.basename(filePath)}.')
-        dcm = pydicom.dcmread(filePath)
-
-        # Dicom CT
-        if dcm.SOPClassUID == "1.2.840.10008.5.1.4.1.1.2":
-            # Dicom CT are not loaded directly. All slices must first be classified according to SeriesInstanceUID.
-
-            # this checks if a breathingPeriod file is present in the ct folder or in the parent of the ct folder
-            # if yes, this ct slice is given a dynamic series index
-            dynSeriesIndex = -1
-            for txtFilePathIndex, txtFilePath in enumerate(fileLists["txt"]):
-                if txtFilePath.endswith('breathingPeriod.txt'):
-                    if os.path.dirname(txtFilePath) == os.path.dirname(filePath) or os.path.dirname(txtFilePath) == os.path.dirname(os.path.dirname(filePath)):
-                        dynSeriesIndex = txtFilePathIndex
-                        ## associer la slice à une série 4D
-
-            newCT = 1
-            for key in dicomCT:
-                if key == dcm.SeriesInstanceUID:
-                    dicomCT[dcm.SeriesInstanceUID].append(filePath)
-                    newCT = 0
-            if newCT == 1:
-                dicomCT[dcm.SeriesInstanceUID] = [dynSeriesIndex, filePath]
-
-        # Dicom dose
-        elif dcm.SOPClassUID == "1.2.840.10008.5.1.4.1.1.481.2":
-            dose = readDicomDose(filePath)
-            dataList.append(dose)
-
-        # Dicom RT Photon and Ion plan
-        elif dcm.SOPClassUID in ("1.2.840.10008.5.1.4.1.1.481.8","1.2.840.10008.5.1.4.1.1.481.5"):
-            plan = readDicomPlan(filePath)
-            dataList.append(plan)
-
-        # Dicom struct
-        elif dcm.SOPClassUID == "1.2.840.10008.5.1.4.1.1.481.3":
-            struct = readDicomStruct(filePath)
-            dataList.append(struct)
-
-        else:
-            logger.warning("WARNING: Unknown SOPClassUID " + dcm.SOPClassUID + " for file " + filePath)
-    
-    # import Dicom CT images
-    for key in dicomCT:
-        logger.debug('in dataLoader readData, for key in dicomCT {}'.format(key))
-        logger.debug(dicomCT[key][0])
-        ct = readDicomCT(dicomCT[key][1:])
-        dataList.append(ct)
-                        
+    dicomFiles = scanDicomFiles(inputPaths, maxDepth=maxDepth, nThreads=nThreads)
+    dataList = [readDicomDose(filePath) for filePath in dicomFiles["RTDOSE"]]
+    dataList += [readDicomPlan(filePath) for filePath in dicomFiles["RTPLAN"]]
+    dataList += [readDicomStruct(filePath) for filePath in dicomFiles["RTSTRUCT"]]
+    dataList += [readDicomCT(ctFiles) for ctFiles in dicomFiles["CT"].values()]
     return dataList
 
-def listAllFiles(inputPaths, maxDepth=-1):
+
+def scanDicomFiles(inputPaths, maxDepth=-1, nThreads=16) -> dict:
     """
-    List all files of compatible data format from given input paths.
+    Classify the DICOM files found at the given input path, reading only their headers.
+
+    The headers are read in parallel, because opening each file is the dominant cost on network shares, and pixel
+    data is never read. MR and registration files are skipped silently, other unsupported DICOM files with one
+    warning per SOP class, and files that are not DICOM at debug level.
 
     Parameters
     ----------
     inputPaths: str or list
-        Path or list of paths pointing to the data to be listed.
+        Path or list of paths pointing to the data to be scanned.
+
+    maxDepth: int, optional
+        Maximum subfolder depth where the function will check for files.
+        Default is -1, which implies recursive search over infinite subfolder depth.
+
+    nThreads: int, optional
+        Number of threads reading the headers. Default 16.
+
+    Returns
+    -------
+    dicomFiles: dict
+        ``{"CT": {SeriesInstanceUID: [paths]}, "RTDOSE": [paths], "RTSTRUCT": [paths], "RTPLAN": [paths]}``,
+        with the paths in file listing order.
+    """
+    filePaths = listFiles(inputPaths, maxDepth=maxDepth)
+    headers = readDicomHeaders(filePaths, nThreads=nThreads)
+
+    dicomFiles = {"CT": {}, "RTDOSE": [], "RTSTRUCT": [], "RTPLAN": []}
+    ignored, unsupported, nonDicom = {}, {}, 0
+    for filePath, header in zip(filePaths, headers):
+        if header is None:
+            nonDicom += 1
+            continue
+        sopClassUID = str(header.get("SOPClassUID", ""))
+        modality = str(header.get("Modality", ""))
+        if sopClassUID == _CT_SOP_CLASS:
+            dicomFiles["CT"].setdefault(str(header.get("SeriesInstanceUID", "")), []).append(filePath)
+        elif sopClassUID == _RTDOSE_SOP_CLASS:
+            dicomFiles["RTDOSE"].append(filePath)
+        elif sopClassUID == _RTSTRUCT_SOP_CLASS:
+            dicomFiles["RTSTRUCT"].append(filePath)
+        elif sopClassUID in _RTPLAN_SOP_CLASSES or modality == "RTPLAN":
+            dicomFiles["RTPLAN"].append(filePath)
+        elif modality in _IGNORED_MODALITIES:
+            ignored[modality] = ignored.get(modality, 0) + 1
+        else:
+            unsupported.setdefault(sopClassUID, []).append(filePath)
+
+    for sopClassUID, paths in unsupported.items():
+        logger.warning(f"Skipped {len(paths)} DICOM file(s) with unsupported SOPClassUID {sopClassUID}, e.g. {paths[0]}")
+    nSlices = sum(len(ctFiles) for ctFiles in dicomFiles["CT"].values())
+    logger.info(
+        f"Scanned {len(filePaths)} files: {nSlices} CT slices in {len(dicomFiles['CT'])} series, "
+        f"{len(dicomFiles['RTDOSE'])} RTDOSE, {len(dicomFiles['RTSTRUCT'])} RTSTRUCT, {len(dicomFiles['RTPLAN'])} RTPLAN, "
+        f"ignored {ignored if ignored else 'none'}, {nonDicom} non-DICOM files."
+    )
+    return dicomFiles
+
+
+def readDicomHeaders(filePaths, nThreads=16) -> list:
+    """
+    Read the classification tags of many files in parallel.
+
+    Parameters
+    ----------
+    filePaths : list of str
+        Paths of the files to read.
+    nThreads : int, optional
+        Number of threads reading the headers. Default 16.
+
+    Returns
+    -------
+    list
+        For each file, in the order of ``filePaths``, a pydicom dataset holding only SOPClassUID, Modality and
+        SeriesInstanceUID, or None if the file is not a readable DICOM file.
+    """
+    executor = ThreadPoolExecutor(max_workers=max(1, int(nThreads)))
+    futures = [executor.submit(_readDicomHeader, filePath) for filePath in filePaths]
+    try:
+        # wait in short slices: a blocking wait on Windows would hold back Ctrl+C until every header is read
+        pending = futures
+        while pending:
+            pending = wait(pending, timeout=0.5).not_done
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+    return [future.result() for future in futures]
+
+
+def _readDicomHeader(filePath):
+    try:
+        return pydicom.dcmread(filePath, stop_before_pixels=True, specific_tags=_HEADER_TAGS)
+    except InvalidDicomError:
+        logger.debug(f"Not a DICOM file, skipped: {filePath}")
+    except Exception as error:
+        logger.warning(f"Could not read the DICOM header of {filePath}, skipped: {type(error).__name__}: {error}")
+    return None
+
+
+def listFiles(inputPaths, maxDepth=-1) -> List[str]:
+    """
+    List all files found at the given input paths.
+
+    Parameters
+    ----------
+    inputPaths: str or list
+        Path or list of paths pointing to the files or folders to be listed.
 
     maxDepth: int, optional
         Maximum subfolder depth where the function will check for files to be listed.
@@ -206,83 +316,32 @@ def listAllFiles(inputPaths, maxDepth=-1):
 
     Returns
     -------
-    fileLists: dictionary
-        The function returns a dictionary containing lists of data files classified according to their file format (Dicom, MHD).
+    filePaths: list of str
+        The file paths, sorted by name within each folder.
 
+    Raises
+    ------
+    FileNotFoundError
+        If an input path does not exist.
     """
+    if isinstance(inputPaths, (list, tuple)):
+        return [filePath for inputPath in inputPaths for filePath in listFiles(inputPath, maxDepth=maxDepth)]
+    if os.path.isfile(inputPaths):
+        return [os.fspath(inputPaths)]
+    if not os.path.isdir(inputPaths):
+        raise FileNotFoundError(f"No such file or directory: {inputPaths}")
 
-    fileLists = {
-        "Dicom": [],
-        "MHD": [],
-        "Serialized": [],
-        "txt": []
-    }
-    # if inputPaths is a list of path, then iteratively call this function with each path of the list
-    if(isinstance(inputPaths, list)):
-        for path in inputPaths:
-            lists = listAllFiles(path, maxDepth=maxDepth)
-            for key in fileLists:
-                fileLists[key] += lists[key]
-
-        return fileLists
-
-
-    # check content of the input path
-    if os.path.isdir(inputPaths):
-        inputPathContent = sorted(os.listdir(inputPaths))
-    else:
-        inputPathContent = [inputPaths]
-        inputPaths = ""
-
-
-    for fileName in inputPathContent:
-        filePath = os.path.join(inputPaths, fileName)
-
-        # folders
-        if os.path.isdir(filePath):
-            if(maxDepth != 0):
-                subfolderFileList = listAllFiles(filePath, maxDepth=maxDepth-1)
-                for key in fileLists:
-                    fileLists[key] += subfolderFileList[key]
-
-        # files
-        elif os.path.isfile(filePath):
-            filetype = get_file_type(filePath)
-            if filetype is None:
-                logger.info("INFO: cannot recognize file format of " + filePath)
-            else:
-                fileLists[filetype].append(filePath)
-
-    return fileLists
-
-
-def get_file_type(filePath):
-    # Is Dicom file ?
-    dcm = None
-    try:
-        dcm = pydicom.dcmread(filePath)
-    except:
-        pass
-    if(dcm != None):
-        return 'Dicom'
-
-    # Is MHD file ?
-    with open(filePath, 'rb') as fid:
-        data = fid.read(50*1024)  # read 50 kB, which should be more than enough for MHD header
-        if data.isascii():
-            if("ElementDataFile" in data.decode('ascii')): # recognize key from MHD header
-                return 'MHD'
-
-    # Is serialized file ?
-    if filePath.endswith('.p') or filePath.endswith('.pbz2') or filePath.endswith('.pkl') or filePath.endswith('.pickle'):
-        return "Serialized"
-
-    # Is txt file ?
-    if filePath.endswith('.txt'):
-        return 'txt'
-
-    logger.info("INFO: cannot recognize file format of " + filePath)
-    return None
+    filePaths = []
+    # scandir entries carry the file type from the directory listing, avoiding a stat call per file
+    with os.scandir(inputPaths) as iterator:
+        entries = sorted(iterator, key=lambda entry: entry.name)
+    for entry in entries:
+        if entry.is_dir():
+            if maxDepth != 0:
+                filePaths += listFiles(entry.path, maxDepth=maxDepth - 1)
+        elif entry.is_file():
+            filePaths.append(entry.path)
+    return filePaths
 
 
 def readDicomCT(fileList) -> CTImage:
