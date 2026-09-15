@@ -65,7 +65,7 @@ def enable_logging(to_file: bool = False, log_dir: str = os.path.join(os.getcwd(
 def _log_environment_header():
     logger.info("=" * 60)
     logger.info("ProbEval session started")
-    logger.info(f"ProbEval version   : {_safe_version('Probabilistic_Evaluation')}")
+    logger.info(f"ProbEval version   : {_safe_version('RT_Probabilistic_Evaluation')}")
     logger.info(f"Python version  : {platform.python_version()}")
     logger.info(f"Platform        : {platform.platform()}")
     for dep in ("numpy", "scipy", "pydicom"):
