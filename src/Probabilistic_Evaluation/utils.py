@@ -430,13 +430,13 @@ def _polygon_to_mask_slice(
 
     ox, oy = float(contour_origin_xy[0]), float(contour_origin_xy[1])
     sx, sy = float(contour_spacing_xy[0]), float(contour_spacing_xy[1])
-    shift_x = 0.5 * (1.0 - sx)
-    shift_y = 0.5 * (1.0 - sy)
+    # (ox, oy) is the centre of the first voxel (RayStation Corner + spacing/2) and polygon2mask samples sub-pixel
+    # centres at integer coordinates, so the precision x precision sub-pixels of a voxel are centred on its centre
     center_offset = 0.5 * (precision - 1)
 
     for poly in polygons_xy:
-        rows = ((poly[:, 0] + shift_x - ox) / sx) * precision + center_offset
-        cols = ((poly[:, 1] + shift_y - oy) / sy) * precision + center_offset
+        rows = ((poly[:, 0] - ox) / sx) * precision + center_offset
+        cols = ((poly[:, 1] - oy) / sy) * precision + center_offset
         polygon_mask = polygon2mask(hr_shape, np.column_stack((rows, cols)))
 
         if precision == 1:
@@ -495,7 +495,8 @@ def get_partial_volume_mask(
     Parameters
     ---------
     origin: array
-        Origin of the output mask image.
+        Coordinates in mm of the centre of the first voxel of the output mask image (DICOM-like origin,
+        i.e. RayStation Corner + spacing/2), as returned by resampling_grid for the dose grid.
     gridSize: array
         Grid size of the output mask image.
     spacing: array
