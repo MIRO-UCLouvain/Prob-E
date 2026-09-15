@@ -181,35 +181,43 @@ def test_partial_volume_mask_volume_with_coarse_contours(dz, tol):
 
 
 def test_between_contour_slices_are_distance_weighted():
-    # two square contours 4 mm apart, the upper one twice as wide: the area must grow linearly in between
+    # two square contours 4 mm apart, 16 and 32 mm^2: the cross-section grows linearly in between, and each plane extends
+    # half the plane distance beyond the ends, so the volume is (16 + 32) mm^2 * 4 mm for any voxel size
     lower = np.array([0, 0, 0, 4, 0, 0, 4, 4, 0, 0, 4, 0], float)
     upper = np.array([0, 0, 4, 8, 0, 4, 8, 4, 4, 0, 4, 4], float)
-    mask = get_partial_volume_mask(ROIContour("wedge", [lower, upper]), np.array([-4.0, -4.0, -4.0]), np.array([16, 16, 12]), np.array([1.0, 1.0, 1.0]), precision=16)
-    area = mask.sum(axis=(0, 1))
+    wedge = ROIContour("wedge", [lower, upper])
+    mask = get_partial_volume_mask(wedge, np.array([-4.0, -4.0, -4.0]), np.array([16, 16, 12]), np.array([1.0, 1.0, 1.0]), precision=16)
+    area = mask.sum(axis=(0, 1))  # mm^2 in each 1 mm slice
     k0, k1 = 4, 8  # slice indices of the two contours
-    expected = np.array([area[k0] + (area[k1] - area[k0]) * (k - k0) / (k1 - k0) for k in range(k0, k1 + 1)])
-    assert np.allclose(area[k0 : k1 + 1], expected, atol=0.05)
+    assert np.allclose(area[k0 + 1 : k1], [20.0, 24.0, 28.0], atol=0.05)
+    for spacing in (0.5, 1.0, 2.0):  # in-plane edges fall on sub-voxel boundaries, so only z can change the volume
+        size, origin = resampling_grid([16, 16, 12], [1.0, 1.0, 1.0], [-4.0, -4.0, -4.0], [spacing] * 3)
+        mask = get_partial_volume_mask(wedge, origin, size, np.array([spacing] * 3), precision=16)
+        assert np.isclose(mask.sum() * spacing**3, 192.0, rtol=0.005), spacing
 
 
 # ----------------------------------------------------------------------------- mask / dose grid alignment
 @pytest.mark.parametrize("spacing", [(0.5, 0.5, 0.5), (1.0, 1.0, 1.0), (2.0, 2.0, 2.0), (3.0, 3.0, 3.0), (2.0, 2.0, 1.0)])
 def test_partial_volume_mask_stays_on_the_contours_for_any_spacing(spacing):
-    """Masks use the grid origin as the centre of the first voxel (RayStation Corner + spacing/2), without a further shift.
+    """Masks sit on the contours for any voxel size: in-plane around the grid origin taken as the centre of the first voxel
+    (RayStation Corner + spacing/2), along z with every contour plane covering half the plane distance on either side.
 
-    The rasterizer used to add 0.5 * (1 - spacing) mm in-plane, which moved the masks off the dose for any spacing but 1 mm.
+    The rasterizer used to add 0.5 * (1 - spacing) mm in-plane, and to snap the planes and the ROI ends to whole voxels in z.
     """
     spacing = np.asarray(spacing, dtype=float)
     size, origin = resampling_grid([60, 60, 40], [1.0, 1.0, 1.0], [-30.0, -30.0, -20.0], spacing)  # as the DICOM reader builds it
-    offsets = []
+    offsets, volumes = [], []
     for k in range(8):  # sub-voxel box positions, so that the partial-volume quantization averages out
         cx, cy = 0.37 + k * spacing[0] / 8, -0.61 + k * spacing[1] / 8
         box = [np.array([cx - 8.3, cy - 5.7, z, cx + 8.3, cy - 5.7, z, cx + 8.3, cy + 5.7, z, cx - 8.3, cy + 5.7, z]) for z in np.arange(-8.0, 8.5, 1.0)]
         mask = get_partial_volume_mask(ROIContour("box", box), origin, size, spacing, precision=16).astype(np.float64)
         index = np.indices(mask.shape).reshape(3, -1)
         centroid = origin + (index * mask.ravel()).sum(axis=1) / mask.sum() * spacing
-        offsets.append(centroid[:2] - [cx, cy])
-    # partial-volume quantization scales with the voxel size; the old offset was 5 to 10 times this tolerance
-    assert np.allclose(np.mean(offsets, axis=0), 0.0, atol=0.05 * spacing[0])
+        offsets.append(centroid - [cx, cy, 0.0])
+        volumes.append(mask.sum() * np.prod(spacing))
+    # partial-volume quantization scales with the voxel size; the old in-plane offset was 5 to 10 times this tolerance
+    assert np.allclose(np.mean(offsets, axis=0), 0.0, atol=0.05 * spacing.max())
+    assert np.isclose(np.mean(volumes), 16.6 * 11.4 * 17.0, rtol=0.01)  # 17 planes 1 mm apart
 
 
 # ----------------------------------------------------------------------------- M14 / H6

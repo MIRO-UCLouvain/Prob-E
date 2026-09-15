@@ -409,12 +409,6 @@ def timed(func):
     return wrapper
 
 
-def _round_half_away_from_zero(value: float) -> int:
-    """Round half values away from zero to avoid banker's rounding shifts."""
-    if value >= 0:
-        return int(np.floor(value + 0.5))
-    return int(np.ceil(value - 0.5))
-
 def _polygon_to_mask_slice(
     polygons_xy,
     contour_origin_xy,
@@ -451,35 +445,72 @@ def _polygon_to_mask_slice(
 
     return np.clip(slice_mask, 0.0, 1.0)
 
-def _group_polygons_by_z(polygonMesh, z_tolerance: float = 1e-3) -> dict:
-    """Group polygons by z coordinate with tolerance clustering."""
-    grouped = {}
+def _group_polygons_by_z(polygonMesh, z_tolerance: float = 1e-2) -> list:
+    """
+    Group the polygons of a contour into planes.
+
+    Polygons whose z lies within ``z_tolerance`` mm of the previous one (in z order) belong to the same plane, located
+    at the mean z of its polygons.
+
+    Returns
+    -------
+    list of (float, list of np.ndarray)
+        Planes sorted by z, each with its polygons as (N, 2) arrays of x, y coordinates in mm.
+    """
+    polygons = []
     for contour_data in polygonMesh:
         coords = np.asarray(contour_data, dtype=float)
         if coords.size < 9 or coords.size % 3 != 0:
             continue
         triplets = coords.reshape(-1, 3)
-        z = float(np.median(triplets[:, 2]))
-        if z_tolerance > 0:
-            z = float(np.round(z / z_tolerance) * z_tolerance)
-        grouped.setdefault(z, []).append(triplets[:, :2])
-    return grouped
+        polygons.append((float(np.median(triplets[:, 2])), triplets[:, :2]))
+    polygons.sort(key=lambda polygon: polygon[0])
 
-def _interpolate_between_two_slices(lower_slice: np.ndarray, upper_slice: np.ndarray, t: float) -> np.ndarray:
+    planes = []
+    for z, xy in polygons:
+        if planes and z - planes[-1][0][-1] <= z_tolerance:
+            planes[-1][0].append(z)
+            planes[-1][1].append(xy)
+        else:
+            planes.append(([z], [xy]))
+    return [(float(np.mean(zs)), polys) for zs, polys in planes]
+
+def _plane_weights(voxel_z, voxel_size, plane_z, cap_below, cap_above) -> np.ndarray:
     """
-    Linear, distance-weighted blend of two contour slices.
+    Weight of every contour plane in the average of the ROI cross-section over the z extent of each voxel.
+
+    Between two consecutive planes the cross-section is interpolated linearly. Below the first and above the last plane
+    it is kept unchanged over ``cap_below`` and ``cap_above`` mm, so that planes a distance d apart hold the volume
+    sum(plane area) * d, whatever the voxel size.
 
     Parameters
     ----------
-    lower_slice, upper_slice : np.ndarray
-        Partial-volume slices at the nearest contour below and above the target slice.
-    t : float
-        Fractional position of the target slice between ``lower_slice`` (t = 0) and ``upper_slice`` (t = 1).
+    voxel_z : np.ndarray
+        Coordinates in mm of the voxel centres along z.
+    voxel_size : float
+        Voxel size in mm along z.
+    plane_z : np.ndarray
+        Sorted coordinates in mm of the contour planes.
+    cap_below, cap_above : float
+        Extent in mm of the cross-section below the first and above the last plane.
+
+    Returns
+    -------
+    np.ndarray
+        Weights of shape (len(voxel_z), len(plane_z)).
     """
-    lower = np.clip(lower_slice, 0.0, 1.0).astype(np.float32)
-    upper = np.clip(upper_slice, 0.0, 1.0).astype(np.float32)
-    t = float(np.clip(t, 0.0, 1.0))
-    return np.clip((1.0 - t) * lower + t * upper, 0.0, 1.0).astype(np.float32)
+    low, high = voxel_z - voxel_size / 2.0, voxel_z + voxel_size / 2.0
+    weights = np.zeros((len(voxel_z), len(plane_z)))
+    weights[:, 0] += np.clip(np.minimum(high, plane_z[0]) - np.maximum(low, plane_z[0] - cap_below), 0.0, None)
+    weights[:, -1] += np.clip(np.minimum(high, plane_z[-1] + cap_above) - np.maximum(low, plane_z[-1]), 0.0, None)
+    for i in range(len(plane_z) - 1):
+        z0, z1 = plane_z[i], plane_z[i + 1]
+        a, b = np.clip(low, z0, z1), np.clip(high, z0, z1)
+        # integral over [a, b] of the linear weight (z - z0) / (z1 - z0) of the upper plane
+        upper = ((b - z0) ** 2 - (a - z0) ** 2) / (2.0 * (z1 - z0))
+        weights[:, i] += (b - a) - upper
+        weights[:, i + 1] += upper
+    return weights / voxel_size
 
 def get_partial_volume_mask(
     contour,
@@ -491,6 +522,11 @@ def get_partial_volume_mask(
 ):
     """
     Convert the ROI contour to a partial-volume mask image.
+
+    Every contour plane is rasterized in-plane with supersampling. Along z, the cross-section is interpolated linearly
+    between consecutive planes and kept unchanged over half the distance to the neighbouring plane beyond the first and
+    last planes, and every voxel receives the average over its z extent. The mask therefore holds the volume
+    sum(plane area * plane distance) at the position of the contours, whatever the voxel size.
 
     Parameters
     ---------
@@ -536,37 +572,26 @@ def get_partial_volume_mask(
     if np.any(gridSize <= 0):
         raise ValueError("gridSize values must be strictly positive.")
 
-    allX = []
-    allY = []
-    allZ = []
-    for contourData in contour.polygonMesh:
-        coords = np.asarray(contourData, dtype=float)
-        if coords.size < 9 or coords.size % 3 != 0:
-            continue
-        allX.append(coords[0::3])
-        allY.append(coords[1::3])
-        allZ.append(float(np.mean(coords[2::3])))
+    planes = _group_polygons_by_z(contour.polygonMesh)
+    if not planes:
+        return np.zeros(tuple(gridSize.tolist()), dtype=np.float32)
+    plane_z = np.array([z for z, _ in planes])
+    xy = np.concatenate([polygon for _, polygons in planes for polygon in polygons])
 
-    allX = np.sort(np.concatenate(allX).astype(float))
-    allY = np.sort(np.concatenate(allY).astype(float))
-    allZ = np.sort(np.asarray(allZ, dtype=float))
+    # every plane covers half the distance to its neighbours; a lone plane covers one voxel
+    cap_below = 0.5 * (plane_z[1] - plane_z[0]) if len(planes) > 1 else 0.5 * float(spacing[2])
+    cap_above = 0.5 * (plane_z[-1] - plane_z[-2]) if len(planes) > 1 else 0.5 * float(spacing[2])
 
-    contour_min = np.array([allX[0], allY[0], allZ[0]], dtype=float)
-    contour_max = np.array([allX[-1], allY[-1], allZ[-1]], dtype=float)
-
-    zDiff = np.abs(np.diff(allZ))
-    zDiff[zDiff == 0] = np.inf
-    finite_zDiff = zDiff[np.isfinite(zDiff)]
-    native_z_spacing = float(finite_zDiff.min()) if finite_zDiff.size > 0 else float(spacing[2])
+    contour_min = np.array([xy[:, 0].min(), xy[:, 1].min(), plane_z[0] - cap_below], dtype=float)
+    contour_max = np.array([xy[:, 0].max(), xy[:, 1].max(), plane_z[-1] + cap_above], dtype=float)
 
     box_start_idx = np.floor((contour_min - origin) / spacing - 0.5).astype(int)
     box_end_idx = np.ceil((contour_max - origin) / spacing + 0.5).astype(int)
 
-    if float(spacing[2]) < native_z_spacing:
-        box_end_idx[2] += 1
-
     box_start_idx = np.maximum(box_start_idx, 0)
     box_end_idx = np.minimum(box_end_idx, gridSize - 1)
+    if np.any(box_end_idx < box_start_idx):
+        return np.zeros(tuple(gridSize.tolist()), dtype=np.float32)
 
     box_grid_size = (box_end_idx - box_start_idx + 1).astype(int)
     box_origin = origin + box_start_idx.astype(float) * spacing
@@ -586,106 +611,21 @@ def get_partial_volume_mask(
             ),
         )
 
-    z_group_tol = max(1e-4, 0.02 * float(spacing[2]))
-    grouped = _group_polygons_by_z(contour.polygonMesh, z_tolerance=z_group_tol)
-
-    interpolate_z = float(spacing[2]) < native_z_spacing
-
-    if interpolate_z:
-        grouped_by_k = {}
-        for z_val, polys in grouped.items():
-            k_global = _round_half_away_from_zero((float(z_val) - float(origin[2])) / float(spacing[2]))
-            k_local = int(k_global - int(box_start_idx[2]))
-            if 0 <= k_local < gz:
-                grouped_by_k.setdefault(k_local, []).extend(polys)
-
-        contour_k = np.array(sorted(grouped_by_k.keys()), dtype=int)
-        first_k = int(contour_k[0])
-        last_k = int(contour_k[-1])
-        native_steps = max(1.0, float(native_z_spacing) / float(spacing[2]))
-        hat_half_steps = 0.5 * native_steps
-        exact_slice_cache = {}
-
-        for k_exact in contour_k:
-            local_mask3D[:, :, int(k_exact)] = _polygon_to_mask_slice(
-                polygons_xy=grouped_by_k[int(k_exact)],
-                contour_origin_xy=box_origin[:2],
-                contour_spacing_xy=spacing[:2],
-                grid_xy=(gx, gy),
-                precision=adaptive_precision,
-                combine_mode="xor",
-            )
-            exact_slice_cache[int(k_exact)] = local_mask3D[:, :, int(k_exact)].copy()
-
-        for k in range(gz):
-            if k in grouped_by_k:
-                continue
-
-            lower_candidates = contour_k[contour_k < k]
-            upper_candidates = contour_k[contour_k > k]
-
-            if lower_candidates.size == 0:
-                d = float(first_k - k)
-                if d <= hat_half_steps:
-                    t_hat = d / max(hat_half_steps, 1e-6)
-                    local_mask3D[:, :, k] = (1.0 - t_hat) * exact_slice_cache[first_k]
-                continue
-
-            if upper_candidates.size == 0:
-                d = float(k - last_k)
-                if d <= hat_half_steps:
-                    t_hat = d / max(hat_half_steps, 1e-6)
-                    local_mask3D[:, :, k] = (1.0 - t_hat) * exact_slice_cache[last_k]
-                continue
-
-            k0 = int(lower_candidates[-1])
-            k1 = int(upper_candidates[0])
-            if k1 <= k0:
-                continue
-
-            local_mask3D[:, :, k] = _interpolate_between_two_slices(
-                exact_slice_cache[k0],
-                exact_slice_cache[k1],
-                t=(k - k0) / (k1 - k0),
-            )
-
-        for k_exact, exact_slice in exact_slice_cache.items():
-            local_mask3D[:, :, k_exact] = exact_slice
-    else:
-        grouped_z = np.array(sorted(grouped.keys()), dtype=float)
-        contour_k_coarse = []
-        for z_val in grouped_z:
-            k_global = _round_half_away_from_zero((float(z_val) - float(origin[2])) / float(spacing[2]))
-            k_local = int(k_global - int(box_start_idx[2]))
-            if 0 <= k_local < gz:
-                contour_k_coarse.append(k_local)
-
-        coarse_precision = max(1, min(adaptive_precision, 4))
-        coarse_mask_cache = {}
-        first_k_coarse = int(min(contour_k_coarse))
-        last_k_coarse = int(max(contour_k_coarse))
-
-        for k in range(gz):
-            if k < first_k_coarse or k > last_k_coarse:
-                continue
-            z_target = float(box_origin[2]) + k * float(spacing[2])
-            z_sel = float(grouped_z[int(np.argmin(np.abs(grouped_z - z_target)))])
-            polys = grouped[z_sel]
-            if not polys:
-                continue
-            cache_key = float(z_sel)
-            cached_mask = coarse_mask_cache.get(cache_key)
-            if cached_mask is None:
-                cached_mask = _polygon_to_mask_slice(
-                    polygons_xy=polys,
+    # every voxel holds the z-average of the cross-section over its extent: a weighted sum of the nearby rasterized planes
+    weights = _plane_weights(box_origin[2] + np.arange(gz) * spacing[2], float(spacing[2]), plane_z, cap_below, cap_above)
+    plane_masks = {}
+    for k in range(gz):
+        for i in np.flatnonzero(weights[k] > 0):
+            if i not in plane_masks:
+                plane_masks[i] = _polygon_to_mask_slice(
+                    polygons_xy=planes[i][1],
                     contour_origin_xy=box_origin[:2],
                     contour_spacing_xy=spacing[:2],
                     grid_xy=(gx, gy),
-                    precision=coarse_precision,
+                    precision=adaptive_precision,
                     combine_mode="xor",
                 )
-                coarse_mask_cache[cache_key] = cached_mask
-            local_mask3D[:, :, k] = cached_mask
+            local_mask3D[:, :, k] += np.float32(weights[k, i]) * plane_masks[i]
 
     if binarization_threshold is not None:
         if not (0.0 <= float(binarization_threshold) <= 1.0):
