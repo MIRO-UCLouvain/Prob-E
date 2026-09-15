@@ -128,22 +128,30 @@ class DVH(object):
         """
         n_bins = 4096
         if isinstance(self.mask, np.ndarray):
+            # select the ROI voxels once: every `mask > 0` is a full pass over the dose grid
+            inside = self.mask > 0
+            doses = self.dosemap[inside]
+            weights = self.mask[inside]
             bin_size = 101 / n_bins
             bin_edges = np.arange(0, 101 + 0.5 * bin_size, bin_size)
-            bin_edges[-1] += self.dosemap[self.mask>0].max()  # Ensure the max dose is included in the last bin
+            bin_edges[-1] += doses.max()  # Ensure the max dose is included in the last bin
 
-            bin_idx = np.floor( self.dosemap[self.mask>0]/ bin_size).astype(np.int32)
+            bin_idx = np.floor(doses / bin_size).astype(np.int32)
             np.clip(bin_idx, 0, n_bins - 1, out=bin_idx)
-            hist = np.bincount(bin_idx, minlength=n_bins, weights=self.mask[self.mask>0])
+            hist = np.bincount(bin_idx, minlength=n_bins, weights=weights)
 
             dvh = np.cumsum(hist[::-1])[::-1]
             dvh = dvh / np.sum(hist) * 100.0
 
             self._bin_dose = (bin_edges[:-1] + bin_edges[1:]) / 2.0
             self._dvh = dvh
-            DMax = self.DMax
-            DMin = self.DMin
-            DMean = self.DMean
+            # fill the cached statistics from the same selection (the properties would redo the full-grid pass)
+            if self._DMax is None:
+                self._DMax = np.max(doses)
+            if self._DMin is None:
+                self._DMin = np.min(doses)
+            if self._DMean is None:
+                self._DMean = np.average(doses, weights=weights)
 
             del self._dosemap
             self._dosemap = None  # free memory
