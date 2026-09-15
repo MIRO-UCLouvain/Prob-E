@@ -2,12 +2,16 @@
 
 The JSON architecture is a list of goal dictionaries, e.g.::
 
-    { "ROI": "PTV",   "type": "Dx",    "dose": 50.4, "volume": 98,           "lower_is_better": false, "priority": 1 }
-    { "ROI": "Liver", "type": "Dxcc",  "dose": 21.0, "absolute_volume": 700, "lower_is_better": true,  "priority": 1 }
-    { "ROI": "Liver", "type": "Dmean", "dose": 15.0,                         "lower_is_better": true,  "priority": 1 }
+    { "ROI": "PTV",   "type": "Dx",    "dose": 50.4, "volume": 98,           "lower_is_better": false, "priority": 1, "probabilistic": true }
+    { "ROI": "Liver", "type": "Dxcc",  "dose": 21.0, "absolute_volume": 700, "lower_is_better": true,  "priority": 1, "probabilistic": false }
+    { "ROI": "Liver", "type": "Dmean", "dose": 15.0,                         "lower_is_better": true,  "priority": 1, "probabilistic": false }
 
 Supported types are ``Dx`` / ``Vx`` (volume in %), ``Dxcc`` / ``Vxcc`` (volume in cc),
 ``Dmean``, ``Dmax`` and ``Dmin``.  Dose is always in Gy and priority is an integer.
+``probabilistic`` marks the goals that are evaluated over the scenarios (passing rates);
+it defaults to false.  The order of the goals in the file is the order used for the
+cumulative passing rates (within equal priorities), so the editor keeps the file order
+and only groups the rows by ROI for display.
 
 Call :func:`edit_clinical_goals` with the path of a JSON file: it starts a local
 Streamlit server, opens the editor in the web browser and returns once the user
@@ -63,7 +67,7 @@ _VOLUME_TYPES = ("Dx", "Vx")
 # Canonical spelling for every accepted (case-insensitive) type string
 _CANONICAL_TYPES: dict[str, str] = {t.upper(): t for t in ("Dx", "Vx", "Dxcc", "Vxcc", "Dmean", "Dmax", "Dmin")}
 
-_EDITOR_KEYS = ("ROI", "type", "dose", "volume", "absolute_volume", "lower_is_better", "priority")
+_EDITOR_KEYS = ("ROI", "type", "dose", "volume", "absolute_volume", "lower_is_better", "priority", "probabilistic")
 
 
 # ----------------------------------------------------------------------------------
@@ -76,8 +80,8 @@ def _goal_from_dict(goal: dict) -> dict:
 
     The editor representation has the keys ``ROI`` (str), ``base`` (Dx, Vx, Dmean,
     Dmax or Dmin), ``dose`` (float or None), ``volume`` (float or None), ``in_cc``
-    (bool), ``lower_is_better`` (bool), ``priority`` (int) and ``extra`` (any
-    additional keys of the original dictionary, kept untouched).
+    (bool), ``lower_is_better`` (bool), ``priority`` (int), ``probabilistic`` (bool)
+    and ``extra`` (any additional keys of the original dictionary, kept untouched).
     """
     raw_type = str(goal.get("type", ""))
     canonical = _CANONICAL_TYPES.get(raw_type.upper())
@@ -102,6 +106,7 @@ def _goal_from_dict(goal: dict) -> dict:
         "in_cc": bool(in_cc),
         "lower_is_better": bool(goal.get("lower_is_better", True)),
         "priority": 0 if priority is None else int(priority),
+        "probabilistic": bool(goal.get("probabilistic", False)),
         "extra": {k: v for k, v in goal.items() if k not in _EDITOR_KEYS},
     }
 
@@ -148,6 +153,7 @@ def _goal_to_dict(goal: dict) -> dict:
 
     out["lower_is_better"] = bool(goal["lower_is_better"])
     out["priority"] = priority
+    out["probabilistic"] = bool(goal.get("probabilistic", False))
     out.update(goal.get("extra", {}))
     return out
 
@@ -164,8 +170,9 @@ def load_goals(json_path: str | Path) -> list[dict]:
 def save_goals(json_path: str | Path, goals: list[dict]) -> None:
     """Write editor goals to ``json_path`` in the one-goal-per-line JSON layout.
 
-    Goals are written in their current order; a blank line separates groups of
-    consecutive goals that belong to different ROIs, like the reference files.
+    Goals are written in their current (file) order, which is the order used for the
+    cumulative passing rates; a blank line separates groups of consecutive goals that
+    belong to different ROIs, like the reference files.
     """
     dicts = [_goal_to_dict(g) for g in goals]
     lines = ["["]
@@ -193,7 +200,7 @@ def _validate(goals: list[dict]) -> list[str]:
 
 
 def _new_goal() -> dict:
-    return {"ROI": "", "base": "Dx", "dose": None, "volume": None, "in_cc": False, "lower_is_better": True, "priority": 0, "extra": {}}
+    return {"ROI": "", "base": "Dx", "dose": None, "volume": None, "in_cc": False, "lower_is_better": True, "priority": 0, "probabilistic": False, "extra": {}}
 
 
 def _snapshot(goals: list[dict]) -> str:
@@ -205,16 +212,29 @@ def _snapshot(goals: list[dict]) -> str:
 # Streamlit web app  (executed by ``streamlit run clinicalGoalsEditor.py -- <json> <state>``)
 # ----------------------------------------------------------------------------------
 
-_FIELDS = ("ROI", "base", "dose", "volume", "in_cc", "lower_is_better", "priority")
+_FIELDS = ("ROI", "base", "dose", "volume", "in_cc", "lower_is_better", "priority", "probabilistic")
 
 
 def _sort_goals(goals: list[dict]) -> list[dict]:
-    """Stable sort by ROI name (case-insensitive); goals without an ROI go last.
+    """Display order: stable sort by ROI name (case-insensitive); goals without an ROI go last.
 
-    Goals of the same ROI keep their relative order, so a copy stays next to its
-    source and a goal whose ROI is edited moves to the group of its new ROI.
+    Only used to lay out the table. The goals list itself keeps the file order, which
+    is what the evaluator uses for the cumulative passing rates. Goals of the same ROI
+    keep their relative order, so a copy stays next to its source and a goal whose ROI
+    is edited is displayed with the group of its new ROI.
     """
     return sorted(goals, key=lambda g: (g["ROI"].strip() == "", g["ROI"].strip().lower()))
+
+
+def _insert_in_roi_group(goals: list[dict], goal: dict) -> None:
+    """Insert ``goal`` after the last goal of the same ROI (file order), or append it."""
+    roi = goal["ROI"].strip().lower()
+    position = len(goals)
+    if roi:
+        for i, g in enumerate(goals):
+            if g["ROI"].strip().lower() == roi:
+                position = i + 1
+    goals.insert(position, goal)
 
 
 def _run_app(json_path: Path, state_file: Path | None) -> None:
@@ -233,8 +253,7 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
             st.stop()
         for g in goals:
             g["gid"] = uuid.uuid4().hex
-        goals = _sort_goals(goals)
-        ss.goals = goals
+        ss.goals = goals  # file order is kept; the table is only displayed grouped by ROI
         ss.loaded_path = str(json_path)
         ss.saved_snapshot = _snapshot(goals)
         ss.saved = False
@@ -264,8 +283,6 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
                     goal[field] = TYPE_LABELS[ss[key]] if field == "base" else ss[key]
 
     sync_from_widgets()
-    # keep the table grouped by ROI at all times (a renamed goal moves to its new group)
-    ss.goals = _sort_goals(ss.goals)
 
     # ------------------------------------------------------ callbacks --
     # (run by Streamlit before the script body, with the widget values already applied)
@@ -277,8 +294,7 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
         same_roi = [g for g in ss.goals if g["ROI"].strip().lower() == goal["ROI"].lower()]
         if same_roi:  # inherit the priority used by the goals of that ROI
             goal["priority"] = same_roi[-1]["priority"]
-        ss.goals.append(goal)
-        ss.goals = _sort_goals(ss.goals)  # lands in its ROI group (or last while the ROI is empty)
+        _insert_in_roi_group(ss.goals, goal)  # after the last goal of its ROI in the file (or last while the ROI is empty)
 
     def copy_goal(gid: str) -> None:
         sync_from_widgets()
@@ -373,19 +389,20 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
     # ---------------------------------------------------------- table --
     filter_text = st.text_input("Filter by ROI", value="", placeholder="type part of an ROI name to show only those goals", key="roi_filter").strip().lower()
 
-    widths = [0.4, 2.4, 2.0, 1.1, 1.1, 0.9, 1.1, 0.9, 0.45, 0.45]
+    widths = [0.4, 2.4, 2.0, 1.1, 1.1, 0.9, 1.1, 0.9, 1.0, 0.45, 0.45]
     header = st.columns(widths, vertical_alignment="bottom")
-    for col, label in zip(header, ("#", "ROI", "Type", "Dose (Gy)", "Volume", "in cc", "Lower is better", "Priority", "", "")):
+    for col, label in zip(header, ("#", "ROI", "Type", "Dose (Gy)", "Volume", "in cc", "Lower is better", "Priority", "Probabilistic", "", "")):
         col.markdown(f"**{label}**")
 
     type_labels = list(TYPE_LABELS)
-    for i, goal in enumerate(ss.goals):
+    # rows are displayed grouped by ROI; "#" is the position in the file (the cumulative evaluation order)
+    for goal in _sort_goals(ss.goals):
         if filter_text and filter_text not in goal["ROI"].lower():
             continue
         gid = goal["gid"]
         cols = st.columns(widths, vertical_alignment="center")
 
-        cols[0].markdown(f"{i + 1}")
+        cols[0].markdown(f"{index_of(gid) + 1}")
         goal["ROI"] = cols[1].text_input("ROI", value=goal["ROI"], key=widget_key("ROI", gid), label_visibility="collapsed")
         goal["base"] = TYPE_LABELS[cols[2].selectbox("Type", type_labels, index=type_labels.index(_BASE_TO_LABEL[goal["base"]]), key=widget_key("base", gid), label_visibility="collapsed")]
         goal["dose"] = cols[3].number_input("Dose (Gy)", value=goal["dose"], min_value=0.0, step=0.1, format="%g", placeholder="Gy", key=widget_key("dose", gid), label_visibility="collapsed")
@@ -401,9 +418,10 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
 
         goal["lower_is_better"] = cols[6].checkbox("Lower is better", value=goal["lower_is_better"], key=widget_key("lower_is_better", gid), label_visibility="collapsed")
         goal["priority"] = cols[7].number_input("Priority", value=int(goal["priority"]), min_value=0, step=1, format="%d", key=widget_key("priority", gid), label_visibility="collapsed")
+        goal["probabilistic"] = cols[8].checkbox("Probabilistic", value=bool(goal.get("probabilistic", False)), key=widget_key("probabilistic", gid), label_visibility="collapsed", help="Evaluate this goal over the scenarios (passing rate)")
 
-        cols[8].button("", icon=":material/content_copy:", key=f"copy_{gid}", help="Duplicate this goal", on_click=copy_goal, args=(gid,))
-        cols[9].button("", icon=":material/delete:", key=f"delete_{gid}", help="Delete this goal", on_click=delete_goal, args=(gid,))
+        cols[9].button("", icon=":material/content_copy:", key=f"copy_{gid}", help="Duplicate this goal", on_click=copy_goal, args=(gid,))
+        cols[10].button("", icon=":material/delete:", key=f"delete_{gid}", help="Delete this goal", on_click=delete_goal, args=(gid,))
 
     # ------------------------------------------------------ add goal --
     st.markdown("**Add a goal**")
@@ -413,7 +431,7 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
         if g["ROI"].strip() and g["ROI"] not in roi_names:
             roi_names.append(g["ROI"])
     a1.selectbox("ROI of the new goal", roi_names, index=None, placeholder="pick an ROI or type a new one", accept_new_options=True, key="new_goal_roi", label_visibility="collapsed")
-    a2.button("➕ Add goal", on_click=add_goal, key="add_button", help="The goal is inserted in the group of its ROI (at the end while the ROI is empty)")
+    a2.button("➕ Add goal", on_click=add_goal, key="add_button", help="The goal is inserted after the last goal of its ROI in the file (at the end while the ROI is empty)")
 
 
 # ----------------------------------------------------------------------------------
@@ -426,13 +444,16 @@ def edit_clinical_goals(json_path: str | Path) -> bool:
 
     A local Streamlit server is started and the editor opens in the default web
     browser.  The page lets the user add, copy, delete and modify clinical goals.
-    The table is always grouped by ROI (alphabetically, case-insensitive): a new or
-    copied goal is placed with the other goals of its ROI, and a goal whose ROI is
-    edited moves to its new group.  The goal type is chosen from a drop-down; for
-    *dose at volume* and
-    *volume at dose* goals a tick box selects whether the volume is given in cc
-    (ticked) or in % (default).  Dose is in Gy and priority is an integer.  *Save*
-    writes the goals back to the same JSON file in the standard architecture.
+    The table is displayed grouped by ROI (alphabetically, case-insensitive) while
+    the file order, which the evaluator uses for the cumulative passing rates, is
+    preserved: a new goal is inserted after the last goal of its ROI in the file, a
+    copy right after its source, and a goal whose ROI is edited keeps its place in
+    the file but is displayed with its new group.  The goal type is chosen from a
+    drop-down; for *dose at volume* and *volume at dose* goals a tick box selects
+    whether the volume is given in cc (ticked) or in % (default).  Dose is in Gy,
+    priority is an integer and the *Probabilistic* tick box marks the goals that
+    are evaluated over the scenarios.  *Save* writes the goals back to the same
+    JSON file in the standard architecture.
 
     The call blocks until the user presses *Close* in the page (or closes the
     browser tab) and returns ``True`` when the file was saved at least once during

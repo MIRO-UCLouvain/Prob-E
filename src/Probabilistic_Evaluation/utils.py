@@ -5,7 +5,7 @@ import warnings
 from functools import wraps
 
 from skimage.draw import polygon2mask
-from scipy.ndimage import shift, gaussian_filter, map_coordinates
+from scipy.ndimage import shift, gaussian_filter, affine_transform
 
 from Probabilistic_Evaluation.logging_utils import log_call, logger
 
@@ -50,7 +50,10 @@ def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrig
     ImagePositionPatient convention), so target centres lie at
     ``newOrigin + i * newSpacing`` and current centres at ``origin + j * spacing``.
     Target voxels that fall outside the current grid take the value of the
-    nearest edge voxel.
+    nearest edge voxel. The grids are axis aligned, so the mapping is a scale
+    and an offset per axis, applied with ``affine_transform`` without building
+    the coordinates of every target voxel. When the target grid equals the
+    current grid, ``imageArray`` itself is returned.
 
     Along axes where the target spacing is coarser than the current one, point
     sampling would alias the gradients. With ``antialias`` the image is first
@@ -79,7 +82,8 @@ def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrig
     Returns
     -------
     np.ndarray
-        Resampled image of shape ``newGridSize`` and the same dtype as ``imageArray``.
+        Resampled image of shape ``newGridSize`` and the same dtype as ``imageArray``
+        (``imageArray`` itself, not a copy, when the grid is unchanged).
     """
     spacing = np.asarray(spacing, dtype=float)
     origin = np.asarray(origin, dtype=float)
@@ -87,20 +91,69 @@ def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrig
     newGridSize = np.asarray(newGridSize, dtype=int)
     newOrigin = np.asarray(newOrigin, dtype=float)
 
+    # same grid up to floating point noise (e.g. from resampling_grid): nothing to interpolate
+    if (np.array_equal(newGridSize, imageArray.shape) and np.allclose(newSpacing, spacing, rtol=0, atol=1e-9)
+            and np.allclose(newOrigin, origin, rtol=0, atol=1e-6)):
+        return imageArray
+
     image = imageArray
     ratio = newSpacing / spacing
     if antialias and np.any(ratio > 1):
         sigma = np.where(ratio > 1, (ratio - 1) / 2, 0.0)
         image = gaussian_filter(image, sigma=sigma, mode="nearest")
 
-    # Fractional index in the current grid of every target voxel centre, per axis
-    axes = [
-        ((newOrigin[a] + np.arange(newGridSize[a]) * newSpacing[a] - origin[a]) / spacing[a]).astype(np.float32)
-        for a in range(3)
-    ]
-    coords = np.meshgrid(*axes, indexing="ij")
+    # target index i along an axis maps to the fractional index ratio * i + (newOrigin - origin) / spacing
+    return affine_transform(
+        image, ratio, offset=(newOrigin - origin) / spacing, output_shape=tuple(newGridSize.tolist()),
+        order=1, mode="nearest", output=imageArray.dtype,
+    )
 
-    return map_coordinates(image, coords, order=1, mode="nearest").astype(imageArray.dtype, copy=False)
+
+def resampling_grid(gridSize, spacing, origin, newSpacing):
+    """
+    Target grid for resampling an image onto a new voxel spacing while keeping its physical extent.
+
+    ``origin`` is the coordinate of the centre of the first voxel (DICOM ImagePositionPatient
+    convention). The physical extent of the current grid runs from the outer edge of its first voxel
+    to the outer edge of its last voxel, i.e. ``gridSize * spacing`` per axis. The returned grid starts
+    at that same outer edge, so its first voxel centre lies at ``origin - spacing/2 + newSpacing/2``,
+    and it holds ``ceil(gridSize * spacing / newSpacing)`` voxels per axis, so that it covers at least
+    the same extent. For ``newSpacing == spacing`` the grid is returned unchanged.
+
+    Use it for every resampling so that dose and masks derived from the same source grid share one
+    origin (e.g. a RayStation dose grid resampled to 1 mm and ROI masks requested with the RayStation
+    grid corner and 1 mm voxels).
+
+    Parameters
+    ----------
+    gridSize : array-like
+        Current number of voxels (x, y, z).
+    spacing : array-like
+        Current voxel spacing in mm (x, y, z).
+    origin : array-like
+        Current coordinates in mm of the centre of the first voxel (x, y, z).
+    newSpacing : array-like
+        Target voxel spacing in mm (x, y, z).
+
+    Returns
+    -------
+    newGridSize : np.ndarray of int
+        Target number of voxels (x, y, z).
+    newOrigin : np.ndarray of float
+        Target coordinates in mm of the centre of the first voxel (x, y, z).
+    """
+    gridSize = np.asarray(gridSize, dtype=float)
+    spacing = np.asarray(spacing, dtype=float)
+    origin = np.asarray(origin, dtype=float)
+    newSpacing = np.asarray(newSpacing, dtype=float)
+    if np.any(spacing <= 0) or np.any(newSpacing <= 0):
+        raise ValueError("spacing and newSpacing must be strictly positive.")
+
+    extent = gridSize * spacing
+    # round before ceil so that exact ratios affected by floating point noise do not gain a voxel
+    newGridSize = np.ceil(np.round(extent / newSpacing, 6)).astype(int)
+    newOrigin = origin - spacing / 2.0 + newSpacing / 2.0
+    return newGridSize, newOrigin
 
 
 def linearInterpolator(x: float, x_array: np.ndarray, y_array: np.ndarray) -> float:
@@ -412,24 +465,21 @@ def _group_polygons_by_z(polygonMesh, z_tolerance: float = 1e-3) -> dict:
         grouped.setdefault(z, []).append(triplets[:, :2])
     return grouped
 
-def _interpolate_between_two_slices(lower_slice: np.ndarray, upper_slice: np.ndarray) -> np.ndarray:
-    """Blend two slices, using non-zero values when only one side is present."""
+def _interpolate_between_two_slices(lower_slice: np.ndarray, upper_slice: np.ndarray, t: float) -> np.ndarray:
+    """
+    Linear, distance-weighted blend of two contour slices.
+
+    Parameters
+    ----------
+    lower_slice, upper_slice : np.ndarray
+        Partial-volume slices at the nearest contour below and above the target slice.
+    t : float
+        Fractional position of the target slice between ``lower_slice`` (t = 0) and ``upper_slice`` (t = 1).
+    """
     lower = np.clip(lower_slice, 0.0, 1.0).astype(np.float32)
     upper = np.clip(upper_slice, 0.0, 1.0).astype(np.float32)
-
-    out = 0.5 * (lower + upper)
-    eps = 1e-8
-
-    lower_zero = np.abs(lower) <= eps
-    upper_zero = np.abs(upper) <= eps
-    out[lower_zero & (~upper_zero)] = upper[lower_zero & (~upper_zero)]
-    out[upper_zero & (~lower_zero)] = lower[upper_zero & (~lower_zero)]
-
-    lower_one = np.abs(lower - 1.0) <= eps
-    upper_one = np.abs(upper - 1.0) <= eps
-    out[lower_one | upper_one] = 1.0
-
-    return np.clip(out, 0.0, 1.0).astype(np.float32)
+    t = float(np.clip(t, 0.0, 1.0))
+    return np.clip((1.0 - t) * lower + t * upper, 0.0, 1.0).astype(np.float32)
 
 def get_partial_volume_mask(
     contour,
@@ -595,6 +645,7 @@ def get_partial_volume_mask(
             local_mask3D[:, :, k] = _interpolate_between_two_slices(
                 exact_slice_cache[k0],
                 exact_slice_cache[k1],
+                t=(k - k0) / (k1 - k0),
             )
 
         for k_exact, exact_slice in exact_slice_cache.items():

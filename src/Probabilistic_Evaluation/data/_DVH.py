@@ -213,8 +213,13 @@ class DVH(object):
 
         total_volume_cc = np.sum(self.mask) * np.prod(self.spacing) / 1000.0  # convert mm^3 to cc
         if x > total_volume_cc:
-            raise ValueError("Absolute volume exceeds total volume of the structure.")
-        
+            # the requested volume cannot be reached: the dose received by "at least x cc" is the minimum dose
+            logger.warning(
+                f"Requested absolute volume {x} cc exceeds the structure volume ({total_volume_cc:.4f} cc); "
+                "returning Dmin as the dose to that volume."
+            )
+            return self.DMin
+
         target_percentage = (x / total_volume_cc) * 100.0
 
         dvh_rev = self.dvh[::-1]
