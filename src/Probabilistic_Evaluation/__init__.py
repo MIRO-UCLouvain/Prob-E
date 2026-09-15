@@ -3,11 +3,11 @@ __all__ = [
     "io",
     "core",
     "data",
-    "UI",
+    "ui",
 ]
 
 # Expose subpackages via relative imports
 from . import io
 from . import core
 from . import data
-from . import UI
+from . import ui
