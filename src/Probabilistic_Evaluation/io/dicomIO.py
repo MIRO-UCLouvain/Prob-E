@@ -39,9 +39,10 @@ class DicomReader():
         The data objects loaded from the specified directory: the selected DoseImage and RTStruct, followed by
         one CTImage per CT series when ``loadCT`` is True.
     loadCT : bool
-        Whether the CT series are read. The evaluation only needs the dose and the structures. Default False.
+        Whether the CT series are read. The evaluation itself only needs the dose and the structures. Default True.
     nThreads : int
-        Number of threads reading the DICOM headers while scanning the directory. Default 16.
+        Number of threads reading the DICOM headers while scanning the directory. Values below 1 use all logical
+        CPUs. Default -1.
     """
 
     def __init__(self, spacing=None, loadCT=True, nThreads=-1):
@@ -171,7 +172,7 @@ def _selectFile(filePaths, requested, label, argumentName):
     return filePaths[0]
 
 
-def readData(inputPaths, maxDepth=-1, nThreads=16) -> List[object]:
+def readData(inputPaths, maxDepth=-1, nThreads=-1) -> List[object]:
     """
     Load all DICOM CT, RTDOSE, RTPLAN and RTSTRUCT data found at the given input path.
 
@@ -185,7 +186,7 @@ def readData(inputPaths, maxDepth=-1, nThreads=16) -> List[object]:
         Default is -1, which implies recursive search over infinite subfolder depth.
 
     nThreads: int, optional
-        Number of threads reading the DICOM headers. Default 16.
+        Number of threads reading the DICOM headers. Values below 1 use all logical CPUs. Default -1.
 
     Returns
     -------
@@ -201,7 +202,7 @@ def readData(inputPaths, maxDepth=-1, nThreads=16) -> List[object]:
     return dataList
 
 
-def scanDicomFiles(inputPaths, maxDepth=-1, nThreads=16) -> dict:
+def scanDicomFiles(inputPaths, maxDepth=-1, nThreads=-1) -> dict:
     """
     Classify the DICOM files found at the given input path, reading only their headers.
 
@@ -219,7 +220,7 @@ def scanDicomFiles(inputPaths, maxDepth=-1, nThreads=16) -> dict:
         Default is -1, which implies recursive search over infinite subfolder depth.
 
     nThreads: int, optional
-        Number of threads reading the headers. Default 16.
+        Number of threads reading the headers. Values below 1 use all logical CPUs. Default -1.
 
     Returns
     -------
@@ -262,7 +263,7 @@ def scanDicomFiles(inputPaths, maxDepth=-1, nThreads=16) -> dict:
     return dicomFiles
 
 
-def readDicomHeaders(filePaths, nThreads=16) -> list:
+def readDicomHeaders(filePaths, nThreads=-1) -> list:
     """
     Read the classification tags of many files in parallel.
 
@@ -271,7 +272,7 @@ def readDicomHeaders(filePaths, nThreads=16) -> list:
     filePaths : list of str
         Paths of the files to read.
     nThreads : int, optional
-        Number of threads reading the headers. Default 16.
+        Number of threads reading the headers. Values below 1 use all logical CPUs. Default -1.
 
     Returns
     -------
@@ -279,7 +280,9 @@ def readDicomHeaders(filePaths, nThreads=16) -> list:
         For each file, in the order of ``filePaths``, a pydicom dataset holding only SOPClassUID, Modality and
         SeriesInstanceUID, or None if the file is not a readable DICOM file.
     """
-    executor = ThreadPoolExecutor(max_workers=max(1, int(nThreads)))
+    if nThreads is None or int(nThreads) < 1:
+        nThreads = os.cpu_count() or 1
+    executor = ThreadPoolExecutor(max_workers=int(nThreads))
     futures = [executor.submit(_readDicomHeader, filePath) for filePath in filePaths]
     try:
         # wait in short slices: a blocking wait on Windows would hold back Ctrl+C until every header is read
