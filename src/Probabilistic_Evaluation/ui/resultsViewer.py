@@ -45,12 +45,24 @@ _launch = _import_launch()
 # ---------------------------
 # Load JSON files
 # ---------------------------
+def _is_order_file(path: Path) -> bool:
+    """True if ``path`` looks like a saved row-order file (e.g. ``foo_order.txt``), not a result file."""
+    return "order" in path.stem.lower()
+
+
 def load_results(folder: Path) -> dict:
-    """Read every ``*.json`` file in ``folder`` into ``{stem: {"data": ..., "path": ...}}``."""
+    """Read every ``*.json`` file in ``folder`` into ``{stem: {"data": ..., "path": ...}}``.
+
+    Files whose name contains ``order`` (e.g. a saved ``foo_order.txt`` that ended up with a
+    ``.json`` extension) are skipped, since they hold a saved row order, not result data.
+    """
     results = {}
     print(f"\n=== Loading folder: {folder} ===")
 
     for f in Path(folder).glob("*.json"):
+        if _is_order_file(f):
+            print(f"Skipping order file: {f.name}")
+            continue
         print(f"Loading: {f.name} ... ", end="")
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
@@ -199,7 +211,7 @@ _NUMBER_FORMATTER = "function(params) { return params.value === null || params.v
 def _render_probabilistic_table(ds: dict) -> None:
     """Draggable, colored table of probabilistic objectives, with Save/Load order."""
     import streamlit as st
-    from st_aggrid import AgGrid, DataReturnMode, GridOptionsBuilder, GridUpdateMode, JsCode
+    from st_aggrid import AgGrid, DataReturnMode, GridOptionsBuilder, JsCode
 
     if not ds["prob_rows"]:
         st.caption("No probabilistic objectives in this file.")
@@ -208,6 +220,14 @@ def _render_probabilistic_table(ds: dict) -> None:
     order_key = f"row_order::{ds['key']}"
     if order_key not in st.session_state:
         st.session_state[order_key] = [_row_key(r) for r in ds["prob_rows"]]
+
+    # Bumped whenever the order is set programmatically (e.g. by "Load order") so the grid
+    # below gets a fresh `key` and is fully remounted. Once the user has dragged a row, the
+    # AgGrid component keeps managing row order client-side and ignores new server-provided
+    # data with the same content (order is not part of its change-detection hash), so simply
+    # re-passing a reordered dataframe under the same key would otherwise be a no-op.
+    version_key = f"row_order_version::{ds['key']}"
+    st.session_state.setdefault(version_key, 0)
 
     rows_by_key = {_row_key(r): r for r in ds["prob_rows"]}
     ordered_rows = [rows_by_key[k] for k in st.session_state[order_key] if k in rows_by_key]
@@ -250,11 +270,11 @@ def _render_probabilistic_table(ds: dict) -> None:
     response = AgGrid(
         df,
         gridOptions=gb.build(),
-        update_mode=GridUpdateMode.MODEL_CHANGED,
+        update_on=["rowDragEnd"],
         data_return_mode=DataReturnMode.AS_INPUT,
         allow_unsafe_jscode=True,
         fit_columns_on_grid_load=True,
-        key=f"prob_grid_{ds['key']}",
+        key=f"prob_grid_{ds['key']}_v{st.session_state[version_key]}",
     )
 
     new_order = [_row_key(r) for r in response["data"].to_dict("records")]
@@ -262,24 +282,30 @@ def _render_probabilistic_table(ds: dict) -> None:
         st.session_state[order_key] = new_order
         st.rerun()  # recompute pr/prg/cpr for the new order and redraw with updated colors
 
-    order_file = Path(ds["file_path"]).parent / "order.txt"
-    c1, c2, _ = st.columns([1, 1, 6])
+    # Named after the result file itself (e.g. ``demo_results_order.txt``) so several result
+    # files sharing the same folder don't clobber each other's saved order.
+    order_file = Path(ds["file_path"]).with_name(f"{ds['key']}_order.txt")
+    c1, c2, _ = st.columns([2, 2, 6])
     if c1.button("💾 Save order", key=f"save_order_{ds['key']}"):
         order_file.write_text("\n".join(st.session_state[order_key]), encoding="utf-8")
         st.toast(f"Saved order to {order_file.name}")
     if c2.button("📂 Load order", key=f"load_order_{ds['key']}"):
         if order_file.exists():
             loaded = [k for k in order_file.read_text(encoding="utf-8").splitlines() if k]
-            st.session_state[order_key] = loaded
-            st.rerun()
+            if loaded:
+                st.session_state[order_key] = loaded
+                st.session_state[version_key] += 1
+                st.rerun()
+            else:
+                st.warning(f"{order_file.name} is empty")
         else:
-            st.warning("No saved order")
+            st.warning(f"No saved order ({order_file.name} not found)")
 
 
 def _render_nominal_table(ds: dict) -> None:
     """Read-only table of non-probabilistic objectives, with the same pass/fail styling."""
     import streamlit as st
-    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+    from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
     if not ds["nominal_rows"]:
         st.caption("No non-probabilistic objectives in this file.")
@@ -308,7 +334,7 @@ def _render_nominal_table(ds: dict) -> None:
     AgGrid(
         df,
         gridOptions=gb.build(),
-        update_mode=GridUpdateMode.NO_UPDATE,
+        update_on=[],
         allow_unsafe_jscode=True,
         fit_columns_on_grid_load=True,
         key=f"nominal_grid_{ds['key']}",
@@ -361,7 +387,7 @@ def view_results(folder: str | Path) -> None:
         raise FileNotFoundError(f"Results folder not found: {path}")
     _launch.require_streamlit("The results viewer")
 
-    json_files = sorted(path.glob("*.json"))
+    json_files = sorted(f for f in path.glob("*.json") if not _is_order_file(f))
     if not json_files:
         raise FileNotFoundError(f"No *.json result files found in {path}")
 
