@@ -16,7 +16,8 @@ and only groups the rows by ROI for display.
 Call :func:`edit_clinical_goals` with the path of a JSON file: it starts a local
 Streamlit server, opens the editor in the web browser and returns once the user
 pressed *Close* (or closed the browser tab).  This module only depends on the
-standard library and Streamlit, so the package itself is not imported by the app.
+standard library, Streamlit, and its sibling :mod:`_launch` module, so the rest
+of the package is not imported by the app.
 """
 
 from __future__ import annotations
@@ -24,15 +25,29 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
-import os
-import socket
-import subprocess
 import sys
-import tempfile
-import threading
-import time
 import uuid
 from pathlib import Path
+
+
+def _import_launch():
+    """Import the sibling ``_launch`` module.
+
+    A plain ``from . import _launch`` breaks when this file is executed
+    standalone (``streamlit run clinicalGoalsEditor.py``), since that runs it
+    with no package context and relative imports raise ``ImportError``. Fall
+    back to loading it directly by file path in that case.
+    """
+    try:
+        from . import _launch as module
+    except ImportError:
+        spec = importlib.util.spec_from_file_location("_launch", Path(__file__).resolve().parent / "_launch.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    return module
+
+
+_launch = _import_launch()
 
 # ----------------------------------------------------------------------------------
 # Goal types
@@ -53,13 +68,6 @@ _VOLUME_TYPES = ("Dx", "Vx")
 _CANONICAL_TYPES: dict[str, str] = {t.upper(): t for t in ("Dx", "Vx", "Dxcc", "Vxcc", "Dmean", "Dmax", "Dmin")}
 
 _EDITOR_KEYS = ("ROI", "type", "dose", "volume", "absolute_volume", "lower_is_better", "priority", "probabilistic")
-
-# Heartbeat written by the web app while a browser is connected; the launcher treats the
-# app as closed when it goes stale
-_HEARTBEAT_SECONDS = 1
-_STALE_SECONDS = 15
-_BROWSER_GRACE_SECONDS = 180
-_LIVENESS_THREAD = "clinical-goals-editor-liveness"
 
 
 # ----------------------------------------------------------------------------------
@@ -207,49 +215,6 @@ def _snapshot(goals: list[dict]) -> str:
 _FIELDS = ("ROI", "base", "dose", "volume", "in_cc", "lower_is_better", "priority", "probabilistic")
 
 
-def _write_state(state_file: Path | None, **updates) -> None:
-    """Merge ``updates`` into the small JSON file the launcher polls."""
-    if state_file is None:
-        return
-    try:
-        state = json.loads(state_file.read_text(encoding="utf-8")) if state_file.exists() else {}
-    except (OSError, ValueError):
-        state = {}
-    state.update(updates)
-    state_file.write_text(json.dumps(state), encoding="utf-8")
-
-
-def _active_sessions() -> int | None:
-    """Number of browsers currently connected to this Streamlit server, None if unknown."""
-    try:
-        from streamlit.runtime import get_instance
-
-        return int(get_instance()._session_mgr.num_active_sessions())
-    except Exception:  # private API changed or runtime not started: assume connected
-        return None
-
-
-def _start_liveness_thread(state_file: Path | None) -> None:
-    """Write a heartbeat to ``state_file`` while at least one browser is connected.
-
-    This runs server side, so it keeps going while the browser tab is hidden or
-    throttled; it only stops when every tab is closed (or the server exits).
-    A browser driven timer (``st.fragment(run_every=...)``) is not suitable here
-    because browsers slow such timers down drastically for background tabs.
-    """
-    if state_file is None or any(t.name == _LIVENESS_THREAD for t in threading.enumerate()):
-        return
-
-    def loop() -> None:
-        while True:
-            n = _active_sessions()
-            if n is None or n > 0:
-                _write_state(state_file, alive=time.time())
-            time.sleep(_HEARTBEAT_SECONDS)
-
-    threading.Thread(target=loop, name=_LIVENESS_THREAD, daemon=True).start()
-
-
 def _sort_goals(goals: list[dict]) -> list[dict]:
     """Display order: stable sort by ROI name (case-insensitive); goals without an ROI go last.
 
@@ -355,13 +320,13 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
             return False
         ss.saved_snapshot = _snapshot(ss.goals)
         ss.saved = True
-        _write_state(state_file, saved=True)
+        _launch.write_state(state_file, saved=True)
         ss.flash = ("toast", f"Saved {len(ss.goals)} goals to {json_path.name}")
         return True
 
     def close() -> None:
         ss.closed = True
-        _write_state(state_file, saved=ss.saved, closed=True)
+        _launch.write_state(state_file, saved=ss.saved, closed=True)
 
     def on_close() -> None:
         sync_from_widgets()
@@ -378,7 +343,7 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
         ss.confirm_close = False
 
     # ------------------------------------------------------ heartbeat --
-    _start_liveness_thread(state_file)
+    _launch.start_liveness_thread(state_file)
 
     # --------------------------------------------------------- closed --
     if ss.closed:
@@ -474,12 +439,6 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
 # ----------------------------------------------------------------------------------
 
 
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
 def edit_clinical_goals(json_path: str | Path) -> bool:
     """Open a web based editor for the clinical goals stored in ``json_path``.
 
@@ -509,61 +468,10 @@ def edit_clinical_goals(json_path: str | Path) -> bool:
     path = Path(json_path)
     if not path.is_file():
         raise FileNotFoundError(f"Clinical goals file not found: {path}")
-    if importlib.util.find_spec("streamlit") is None:
-        raise RuntimeError(f"The clinical goals editor needs Streamlit, which is not installed for {sys.executable}")
+    _launch.require_streamlit("The clinical goals editor")
 
-    with tempfile.TemporaryDirectory(prefix="clinical_goals_editor_") as tmp:
-        state_file = Path(tmp) / "state.json"
-        env = dict(os.environ)
-        env.setdefault("STREAMLIT_SERVER_HEADLESS", "false")  # opens the browser
-        env.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
-        cmd = [
-            sys.executable, "-m", "streamlit", "run", str(Path(__file__).resolve()),
-            "--server.port", str(_free_port()),
-            "--server.address", "127.0.0.1",
-            # Streamlit asks for an e-mail address in the terminal the first time it runs on a
-            # machine and waits for the answer; without a console (IDE, double-click) it never
-            # gets one and the server dies before the editor opens.  Disable the prompt.
-            "--server.showEmailPrompt", "false",
-            "--browser.gatherUsageStats", "false",
-            "--", str(path.resolve()), str(state_file),
-        ]
-        # no stdin: the server must never wait for keyboard input
-        proc = subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL)
-        started = time.time()
-        try:
-            while proc.poll() is None:
-                time.sleep(0.5)
-                try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    state = {}
-                if state.get("closed"):
-                    break
-                alive = state.get("alive")
-                if alive is not None and time.time() - alive > _STALE_SECONDS:
-                    break  # browser tab closed
-                if alive is None and time.time() - started > _BROWSER_GRACE_SECONDS:
-                    break  # browser never connected
-        finally:
-            if proc.poll() is None:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-        try:
-            state = json.loads(state_file.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            state = {}
-        if not state.get("closed") and state.get("alive") is None:
-            # the server stopped (or never answered) before a browser connected: say so
-            # instead of silently returning as if the user had closed the editor
-            raise RuntimeError(
-                f"The clinical goals editor did not start (Streamlit exited with code {proc.returncode}); "
-                "see the messages printed above by: " + " ".join(cmd)
-            )
-        return bool(state.get("saved", False))
+    state = _launch.run_streamlit_script(Path(__file__), [str(path.resolve())])
+    return bool(state.get("saved", False))
 
 
 def _inside_streamlit() -> bool:
@@ -574,6 +482,19 @@ def _inside_streamlit() -> bool:
     return get_script_run_ctx() is not None
 
 
+def _cli(prog_name: str = "rt-eval-goals") -> None:
+    """Command-line entry point: opens the editor for one clinical goals JSON file.
+
+    Installed as the ``rt-eval-goals`` console script (available once the
+    ``ui`` extra is installed) and also used for a plain
+    ``python clinicalGoalsEditor.py <file>`` invocation.
+    """
+    args = sys.argv[1:]
+    if len(args) != 1:
+        sys.exit(f"usage: {prog_name} <clinical_goals.json>")
+    edit_clinical_goals(args[0])
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if _inside_streamlit():  # started through `streamlit run`
@@ -581,6 +502,4 @@ if __name__ == "__main__":
             sys.exit("usage: streamlit run clinicalGoalsEditor.py -- <clinical_goals.json> [<state file>]")
         _run_app(Path(args[0]), Path(args[1]) if len(args) > 1 else None)
     else:  # started with plain python
-        if len(args) != 1:
-            sys.exit(f"usage: python {Path(__file__).name} <clinical_goals.json>")
-        edit_clinical_goals(args[0])
+        _cli(f"python {Path(__file__).name}")

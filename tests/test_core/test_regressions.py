@@ -225,7 +225,7 @@ def test_resampling_grid_keeps_the_voxel_edge_extent():
 
 # ----------------------------------------------------------------------------- M11 (editor round trip, no Streamlit needed)
 def test_editor_keeps_probabilistic_flag_and_file_order(tmp_path):
-    from Probabilistic_Evaluation.io.clinicalGoalsEditor import _insert_in_roi_group, _sort_goals, load_goals, save_goals
+    from Probabilistic_Evaluation.ui.clinicalGoalsEditor import _insert_in_roi_group, _sort_goals, load_goals, save_goals
 
     path = tmp_path / "goals.json"
     path.write_text(
@@ -250,7 +250,7 @@ def test_editor_keeps_probabilistic_flag_and_file_order(tmp_path):
 def test_viewer_formats_nominal_values_with_the_goal_unit():
     from pathlib import Path
 
-    from streamlit_app.JSONreader import build_payload
+    from Probabilistic_Evaluation.ui.resultsViewer import build_payload
 
     table = [
         {"Mask Name": "Brain", "Clinical Goal": "V60.0Gy<=3.00cc", "Nominal Value": 0.42, "Nominal Success": True, "Probabilistic Objective": False},

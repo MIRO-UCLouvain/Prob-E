@@ -11,6 +11,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # "dev" alone makes sure the package still imports and tests pass without the
+        # optional ui extra (streamlit) installed; "dev,ui" covers the ui-enabled path.
+        extras: ["dev", "dev,ui"]
 
     steps:
     - name: 📥 Checkout code
@@ -24,7 +30,7 @@ jobs:
     - name: 📦 Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install .[dev]
+        pip install ".[${{ matrix.extras }}]"
 
     - name: 🧪 Run pytest
       run: |
