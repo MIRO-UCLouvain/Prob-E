@@ -50,9 +50,12 @@ class Gaussian3DUncertaintyModel(AbstractUncertaintyModel):
         self.marginSize = marginSize
         self.manual_input = manual_input
         if simulateRandom and manual_input is None:
-            # dose will be blurred, so we need to account for the number of fractions and random errors in the sigma calculation
+            # dose will be blurred, for low number of fractions we account for the number of franctions in the calculation of the sigma, for higher number of fractions we use simplified Van Herk formula (sigma = marginSize/3.2)
             # we assume systematic and random sigma are the same
-            sigma = marginSize/(2.5*np.sqrt(1+1/n)+0.7)
+            if n <=10:
+                sigma = marginSize/(2.5*np.sqrt(1+1/n)+0.7)
+            else: 
+                sigma = marginSize/3.2
             self.sys_parameters = {'mu_x': 0, 'mu_y': 0, 'mu_z': 0, 'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
             self.rand_parameters = {'sigma_x': sigma, 'sigma_y': sigma, 'sigma_z': sigma}
             logger.info(f"Initialized {self.name} with systematic parameters: {self.sys_parameters} and random parameters: {self.rand_parameters}")
