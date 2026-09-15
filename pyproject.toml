@@ -27,6 +27,16 @@ dev = [
   "pytest>=7.4.0,<8.0",
   "ruff>=0.0.297,<1.0"
 ]
+# Needed to use Probabilistic_Evaluation.ui (clinical goals editor + results viewer)
+ui = [
+  "streamlit>=1.42,<2.0",
+  "streamlit-aggrid>=1.0,<2.0"
+]
+
+[project.scripts]
+# Both require the `ui` extra at runtime; without it, the command exits with a clear error.
+rt-eval-goals   = "Probabilistic_Evaluation.ui.clinicalGoalsEditor:_cli"
+rt-view-results = "Probabilistic_Evaluation.ui.resultsViewer:_cli"
 
 
 [tool.setuptools]
@@ -37,5 +47,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]  # makes <repo>/streamlit_app importable in tests
 python_files = ["test_*.py"]
