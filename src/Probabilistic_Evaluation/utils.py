@@ -5,7 +5,7 @@ import warnings
 from functools import wraps
 
 from skimage.draw import polygon2mask
-from scipy.ndimage import shift, gaussian_filter, map_coordinates
+from scipy.ndimage import shift, gaussian_filter, affine_transform
 
 from Probabilistic_Evaluation.logging_utils import log_call, logger
 
@@ -50,7 +50,10 @@ def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrig
     ImagePositionPatient convention), so target centres lie at
     ``newOrigin + i * newSpacing`` and current centres at ``origin + j * spacing``.
     Target voxels that fall outside the current grid take the value of the
-    nearest edge voxel.
+    nearest edge voxel. The grids are axis aligned, so the mapping is a scale
+    and an offset per axis, applied with ``affine_transform`` without building
+    the coordinates of every target voxel. When the target grid equals the
+    current grid, ``imageArray`` itself is returned.
 
     Along axes where the target spacing is coarser than the current one, point
     sampling would alias the gradients. With ``antialias`` the image is first
@@ -79,7 +82,8 @@ def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrig
     Returns
     -------
     np.ndarray
-        Resampled image of shape ``newGridSize`` and the same dtype as ``imageArray``.
+        Resampled image of shape ``newGridSize`` and the same dtype as ``imageArray``
+        (``imageArray`` itself, not a copy, when the grid is unchanged).
     """
     spacing = np.asarray(spacing, dtype=float)
     origin = np.asarray(origin, dtype=float)
@@ -87,20 +91,22 @@ def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrig
     newGridSize = np.asarray(newGridSize, dtype=int)
     newOrigin = np.asarray(newOrigin, dtype=float)
 
+    # same grid up to floating point noise (e.g. from resampling_grid): nothing to interpolate
+    if (np.array_equal(newGridSize, imageArray.shape) and np.allclose(newSpacing, spacing, rtol=0, atol=1e-9)
+            and np.allclose(newOrigin, origin, rtol=0, atol=1e-6)):
+        return imageArray
+
     image = imageArray
     ratio = newSpacing / spacing
     if antialias and np.any(ratio > 1):
         sigma = np.where(ratio > 1, (ratio - 1) / 2, 0.0)
         image = gaussian_filter(image, sigma=sigma, mode="nearest")
 
-    # Fractional index in the current grid of every target voxel centre, per axis
-    axes = [
-        ((newOrigin[a] + np.arange(newGridSize[a]) * newSpacing[a] - origin[a]) / spacing[a]).astype(np.float32)
-        for a in range(3)
-    ]
-    coords = np.meshgrid(*axes, indexing="ij")
-
-    return map_coordinates(image, coords, order=1, mode="nearest").astype(imageArray.dtype, copy=False)
+    # target index i along an axis maps to the fractional index ratio * i + (newOrigin - origin) / spacing
+    return affine_transform(
+        image, ratio, offset=(newOrigin - origin) / spacing, output_shape=tuple(newGridSize.tolist()),
+        order=1, mode="nearest", output=imageArray.dtype,
+    )
 
 
 def resampling_grid(gridSize, spacing, origin, newSpacing):
