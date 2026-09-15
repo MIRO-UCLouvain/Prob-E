@@ -88,8 +88,10 @@ def build_payload(results: dict) -> list[dict]:
             return str(raw_value)
 
         if goal.startswith("V"):
-            return str(round(value * 100, 2)) + "%"
-        return str(round(value, 2)) + "Gy"
+            if goal.endswith("cc"):
+                return "{:.2f}cc".format(value)
+            return "{:.2f}%".format(value*100)
+        return "{:.2f}Gy".format(value)
 
     for key, obj in results.items():
         data = obj["data"]
