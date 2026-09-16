@@ -209,6 +209,20 @@ function(params) {
 
 _NUMBER_FORMATTER = "function(params) { return params.value === null || params.value === undefined ? '' : params.value.toFixed(3); }"
 
+# A table with more rows than this gets a fixed height and scrolls inside the grid, instead of pushing the rest of the
+# page down. Row and header heights are those of the default streamlit-aggrid theme; if they ever change, the grid still
+# scrolls correctly and only the last visible row is cut differently.
+_MAX_VISIBLE_ROWS = 15
+_ROW_HEIGHT = 29
+_HEADER_HEIGHT = 33
+
+
+def _grid_height(n_rows: int) -> int | None:
+    """Grid height in px for ``n_rows`` rows: None (fit every row) up to ``_MAX_VISIBLE_ROWS``, a fixed height above."""
+    if n_rows <= _MAX_VISIBLE_ROWS:
+        return None
+    return _HEADER_HEIGHT + _MAX_VISIBLE_ROWS * _ROW_HEIGHT + 2  # + the 1 px top and bottom border of the grid
+
 
 def _render_probabilistic_table(ds: dict) -> list[dict]:
     """Draggable, colored table of probabilistic objectives, with Save/Load order.
@@ -272,11 +286,12 @@ def _render_probabilistic_table(ds: dict) -> list[dict]:
             valueFormatter=JsCode(_NUMBER_FORMATTER),
             cellStyle=JsCode(_HEAT_CELL_STYLE),
         )
-    gb.configure_grid_options(rowDragManaged=True, animateRows=True, domLayout="autoHeight")
+    gb.configure_grid_options(rowDragManaged=True, animateRows=True)
 
     response = AgGrid(
         df,
         gridOptions=gb.build(),
+        height=_grid_height(len(df)),  # dragging a row to the top or bottom edge scrolls the grid
         update_on=["rowDragEnd"],
         data_return_mode=DataReturnMode.AS_INPUT,
         allow_unsafe_jscode=True,
@@ -338,11 +353,11 @@ def _render_nominal_table(ds: dict) -> None:
     gb.configure_column("clinical_goal", header_name="Clinical Goal")
     gb.configure_column("nominal", header_name="Nominal", cellStyle=JsCode(_PASS_FAIL_CELL_STYLE))
     gb.configure_column("nominal_passed", hide=True)
-    gb.configure_grid_options(domLayout="autoHeight")
 
     AgGrid(
         df,
         gridOptions=gb.build(),
+        height=_grid_height(len(df)),
         update_on=[],
         allow_unsafe_jscode=True,
         fit_columns_on_grid_load=True,

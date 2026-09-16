@@ -39,13 +39,13 @@ class DicomReader():
         The data objects loaded from the specified directory: the selected DoseImage and RTStruct, followed by
         one CTImage per CT series when ``loadCT`` is True.
     loadCT : bool
-        Whether the CT series are read. The evaluation itself only needs the dose and the structures. Default True.
+        Whether the CT series are read. The evaluation itself only needs the dose and the structures. Default False.
     nThreads : int
         Number of threads reading the DICOM headers while scanning the directory. Values below 1 use all logical
         CPUs. Default -1.
     """
 
-    def __init__(self, spacing=None, loadCT=True, nThreads=-1):
+    def __init__(self, spacing=None, loadCT=False, nThreads=-1):
         self.RTSTRUCT: dict = None
         self.RTDOSE: np.ndarray = None
         self.spacing: tuple = spacing
