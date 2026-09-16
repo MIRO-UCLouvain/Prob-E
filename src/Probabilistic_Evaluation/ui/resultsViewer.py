@@ -211,15 +211,34 @@ function(params) {
 
 _NUMBER_FORMATTER = "function(params) { return params.value === null || params.value === undefined ? '' : params.value.toFixed(3); }"
 
+# A table with more rows than this gets a fixed height and scrolls inside the grid, instead of pushing the rest of the
+# page down. Row and header heights are those of the default streamlit-aggrid theme; if they ever change, the grid still
+# scrolls correctly and only the last visible row is cut differently.
+_MAX_VISIBLE_ROWS = 15
+_ROW_HEIGHT = 29
+_HEADER_HEIGHT = 33
 
-def _render_probabilistic_table(ds: dict) -> None:
-    """Draggable, colored table of probabilistic objectives, with Save/Load order."""
+
+def _grid_height(n_rows: int) -> int | None:
+    """Grid height in px for ``n_rows`` rows: None (fit every row) up to ``_MAX_VISIBLE_ROWS``, a fixed height above."""
+    if n_rows <= _MAX_VISIBLE_ROWS:
+        return None
+    return _HEADER_HEIGHT + _MAX_VISIBLE_ROWS * _ROW_HEIGHT + 2  # + the 1 px top and bottom border of the grid
+
+
+def _render_probabilistic_table(ds: dict) -> list[dict]:
+    """Draggable, colored table of probabilistic objectives, with Save/Load order.
+
+    Returns the rows as currently displayed (in the user's chosen order, with the
+    pr/prg/cpr metrics computed for that order) so callers can reuse them (e.g. to
+    export the results).
+    """
     import streamlit as st
     from st_aggrid import AgGrid, DataReturnMode, GridOptionsBuilder, JsCode
 
     if not ds["prob_rows"]:
         st.caption("No probabilistic objectives in this file.")
-        return
+        return []
 
     order_key = f"row_order::{ds['key']}"
     if order_key not in st.session_state:
@@ -269,11 +288,12 @@ def _render_probabilistic_table(ds: dict) -> None:
             valueFormatter=JsCode(_NUMBER_FORMATTER),
             cellStyle=JsCode(_HEAT_CELL_STYLE),
         )
-    gb.configure_grid_options(rowDragManaged=True, animateRows=True, domLayout="autoHeight")
+    gb.configure_grid_options(rowDragManaged=True, animateRows=True)
 
     response = AgGrid(
         df,
         gridOptions=gb.build(),
+        height=_grid_height(len(df)),  # dragging a row to the top or bottom edge scrolls the grid
         update_on=["rowDragEnd"],
         data_return_mode=DataReturnMode.AS_INPUT,
         allow_unsafe_jscode=True,
@@ -289,7 +309,7 @@ def _render_probabilistic_table(ds: dict) -> None:
     # Named after the result file itself (e.g. ``demo_results_order.txt``) so several result
     # files sharing the same folder don't clobber each other's saved order.
     order_file = Path(ds["file_path"]).with_name(f"{ds['key']}_order.txt")
-    c1, c2, _ = st.columns([2, 2, 6])
+    c1, c2, _ = st.columns([1, 1, 6])
     if c1.button("💾 Save order", key=f"save_order_{ds['key']}"):
         order_file.write_text("\n".join(st.session_state[order_key]), encoding="utf-8")
         st.toast(f"Saved order to {order_file.name}")
@@ -304,6 +324,8 @@ def _render_probabilistic_table(ds: dict) -> None:
                 st.warning(f"{order_file.name} is empty")
         else:
             st.warning(f"No saved order ({order_file.name} not found)")
+
+    return computed_rows
 
 
 def _render_nominal_table(ds: dict) -> None:
@@ -333,16 +355,57 @@ def _render_nominal_table(ds: dict) -> None:
     gb.configure_column("clinical_goal", header_name="Clinical Goal")
     gb.configure_column("nominal", header_name="Nominal", cellStyle=JsCode(_PASS_FAIL_CELL_STYLE))
     gb.configure_column("nominal_passed", hide=True)
-    gb.configure_grid_options(domLayout="autoHeight")
 
     AgGrid(
         df,
         gridOptions=gb.build(),
+        height=_grid_height(len(df)),
         update_on=[],
         allow_unsafe_jscode=True,
         fit_columns_on_grid_load=True,
         key=f"nominal_grid_{ds['key']}",
     )
+
+
+def _default_export_name(json_path: Path) -> str:
+    """Default "Save results" filename: derived from the displayed file's name, but never
+    equal to it, so saving never silently overwrites the source result file."""
+    return f"{json_path.stem}_export.json"
+
+
+def _save_results(json_path: Path, filename: str, order_keys: list[str]) -> Path:
+    """Save a copy of the source result JSON next to ``json_path``, in the exact same
+    schema (``Table``/``Probability Array``/``Probability Mass``/...), so it can be
+    reopened later exactly like any other result file.
+
+    Only the ``Table`` rows' order is changed, to match ``order_keys`` (the currently
+    displayed ``roi||goal`` order of the probabilistic objectives) - every field, of
+    every row (including ones not covered by ``order_keys``, e.g. non-probabilistic
+    objectives), is copied through unchanged.
+
+    Raises ``ValueError`` if the target name resolves to ``json_path`` itself, to avoid
+    silently overwriting the source result file.
+    """
+    name = filename.strip() or _default_export_name(json_path)
+    if not name.lower().endswith(".json"):
+        name += ".json"
+    export_path = json_path.with_name(name)
+    if export_path.resolve() == json_path.resolve():
+        raise ValueError(f"{name!r} is the file currently being displayed - choose a different name")
+
+    raw = json.loads(json_path.read_text(encoding="utf-8"))
+    table = raw.get("Table", [])
+
+    def _table_row_key(row: dict) -> str:
+        return f"{row.get('Mask Name', '')}||{row.get('Clinical Goal', '')}"
+
+    by_key = {_table_row_key(row): row for row in table}
+    ordered = [by_key[k] for k in order_keys if k in by_key]
+    ordered += [row for row in table if _table_row_key(row) not in order_keys]
+    raw["Table"] = ordered
+
+    export_path.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    return export_path
 
 
 def _run_app(json_path: Path, state_file: Path | None) -> None:
@@ -361,11 +424,33 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
     st.title(f"{ds['key']} — {ds['probability'] * 100:.1f}%")
     st.caption(f"File: `{json_path}`")
 
+    # Rendered here (top of the page) but filled in further down, once the current display
+    # order/computed metrics are known - a Streamlit container keeps its declared position
+    # while letting later code write into it.
+    st.subheader("Save results")
+    save_container = st.container()
+
     st.subheader("Probabilistic objectives")
-    _render_probabilistic_table(ds)
+    prob_computed_rows = _render_probabilistic_table(ds)
 
     st.subheader("Non-probabilistic objectives")
     _render_nominal_table(ds)
+
+    c1, c2 = save_container.columns([4, 1])
+    export_name = c1.text_input(
+        "File name",
+        value=_default_export_name(json_path),
+        key=f"export_name_{ds['key']}",
+        label_visibility="collapsed",
+    )
+    if c2.button("💾 Save results", key=f"save_results_{ds['key']}"):
+        try:
+            order_keys = [_row_key(r) for r in prob_computed_rows]
+            saved_path = _save_results(json_path, export_name, order_keys)
+        except ValueError as e:
+            st.warning(str(e))
+        else:
+            st.toast(f"Saved results to {saved_path.name}")
 
 
 # ----------------------------------------------------------------------------------
@@ -374,7 +459,7 @@ def _run_app(json_path: Path, state_file: Path | None) -> None:
 
 
 def view_results(folder: str | Path) -> None:
-    """Open one results-viewer browser tab per ``*.json`` file found in ``folder``.
+    """Open one results-viewer browser tab per result JSON file.
 
     Each file gets its own local Streamlit server and its own browser tab,
     exactly like each clinical goals file gets its own editor session. The
@@ -383,17 +468,22 @@ def view_results(folder: str | Path) -> None:
     Parameters
     ----------
     folder : str or Path
-        Path to a folder containing one or more probabilistic evaluation
-        result JSON files.
+        Either a folder containing one or more probabilistic evaluation result JSON
+        files (a tab is opened for every ``*.json`` file found there - the default,
+        e.g. what ``rt-view-results`` uses to show everything that's been saved so
+        far), or the path to a single result JSON file (only that one file is shown,
+        e.g. what ``evaluator.py`` uses right after computing it).
     """
     path = Path(folder)
-    if not path.is_dir():
-        raise FileNotFoundError(f"Results folder not found: {path}")
+    if path.is_file():
+        json_files = [path]
+    elif path.is_dir():
+        json_files = sorted(f for f in path.glob("*.json") if not _is_order_file(f))
+        if not json_files:
+            raise FileNotFoundError(f"No *.json result files found in {path}")
+    else:
+        raise FileNotFoundError(f"Results file or folder not found: {path}")
     _launch.require_streamlit("The results viewer")
-
-    json_files = sorted(f for f in path.glob("*.json") if not _is_order_file(f))
-    if not json_files:
-        raise FileNotFoundError(f"No *.json result files found in {path}")
 
     logger.debug(f"Opening the results viewer for {len(json_files)} result files in {path}: {[f.name for f in json_files]}")
     errors: list[Exception] = []
@@ -427,11 +517,12 @@ def _cli(prog_name: str = "rt-view-results") -> None:
 
     Installed as the ``rt-view-results`` console script (available once the
     ``ui`` extra is installed) and also used for a plain
-    ``python resultsViewer.py [folder]`` invocation.
+    ``python resultsViewer.py [folder]`` invocation. Pass a single ``*.json`` file
+    instead of a folder to only view that one result.
     """
     args = sys.argv[1:]
     if len(args) > 1:
-        sys.exit(f"usage: {prog_name} [folder]")
+        sys.exit(f"usage: {prog_name} [folder_or_file]")
     folder = args[0] if args else "Results"  # same default the original script hardcoded
     view_results(folder)
 
