@@ -84,8 +84,8 @@ def test_scan_classifies_on_headers_and_skips_mr_reg_and_other_files(patientFold
     assert len(listFiles(patientFolder, maxDepth=0)) == 4  # RD, RS, REG and notes.txt, subfolders not searched
 
 
-def test_reader_loads_the_ct_by_default_and_skips_it_on_request(patientFolder):
-    reader = DicomReader(loadCT=False)
+def test_reader_skips_the_ct_by_default_and_loads_it_on_request(patientFolder):
+    reader = DicomReader()  # the evaluation only needs the dose and the structures
     reader.load_dicom_series(patientFolder)
     assert np.allclose(reader.RTDOSE, np.transpose(np.arange(24).reshape(4, 2, 3) * 0.01, (2, 1, 0)))
     assert list(reader.RTSTRUCT) == ["GTV"]
@@ -93,7 +93,7 @@ def test_reader_loads_the_ct_by_default_and_skips_it_on_request(patientFolder):
     with pytest.raises(ValueError, match="loadCT=True"):
         reader.readCT()
 
-    reader = DicomReader()
+    reader = DicomReader(loadCT=True)
     reader.load_dicom_series(patientFolder)
     ct, spacing, _, gridSize = reader.readCT()
     assert list(gridSize) == [3, 2, 3] and np.allclose(spacing, [1.0, 1.0, 2.0]) and np.allclose(ct, -1000.0)
