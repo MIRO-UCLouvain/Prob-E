@@ -132,6 +132,8 @@ class DVH(object):
             inside = self.mask > 0
             doses = self.dosemap[inside]
             weights = self.mask[inside]
+            if doses.size == 0:
+                logger.debug(f"DVH mask has no voxel above 0 (mask shape {self.mask.shape}): the DVH of an empty ROI cannot be computed.")
             bin_size = 101 / n_bins
             bin_edges = np.arange(0, 101 + 0.5 * bin_size, bin_size)
             bin_edges[-1] += doses.max()  # Ensure the max dose is included in the last bin
@@ -152,6 +154,8 @@ class DVH(object):
                 self._DMin = np.min(doses)
             if self._DMean is None:
                 self._DMean = np.average(doses, weights=weights)
+            if self._DMax > 101:
+                logger.debug(f"Max dose {self._DMax} exceeds the 101 Gy range of the DVH bins: doses above 101 Gy share the last bin, so dose-volume values above 101 Gy are coarse.")
 
             del self._dosemap
             self._dosemap = None  # free memory

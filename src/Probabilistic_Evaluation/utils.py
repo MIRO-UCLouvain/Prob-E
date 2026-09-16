@@ -27,7 +27,10 @@ def shift_dose_image(doseImage, shift):
     """
     logger.debug(f"Shifting dose image by {shift} voxels.")
     
-    shift = (int(round(shift[0])), int(round(shift[1])), int(round(shift[2])))
+    rounded_shift = (int(round(shift[0])), int(round(shift[1])), int(round(shift[2])))
+    if not np.allclose(shift, rounded_shift):
+        logger.debug(f"Non-integer shift {np.asarray(shift, dtype=float)} rounded to {rounded_shift} voxels: the dose is evaluated at the rounded displacement.")
+    shift = rounded_shift
     if len(shift) != doseImage.ndim:
         raise ValueError("Shift dimensions must match dose image dimensions.")
     shifted_dose = np.roll(doseImage, shift=shift, axis=(0, 1, 2))
@@ -94,12 +97,14 @@ def resample_image(imageArray, spacing, origin, newSpacing, newGridSize, newOrig
     # same grid up to floating point noise (e.g. from resampling_grid): nothing to interpolate
     if (np.array_equal(newGridSize, imageArray.shape) and np.allclose(newSpacing, spacing, rtol=0, atol=1e-9)
             and np.allclose(newOrigin, origin, rtol=0, atol=1e-6)):
+        logger.debug("The target grid equals the current grid: image returned without resampling.")
         return imageArray
 
     image = imageArray
     ratio = newSpacing / spacing
     if antialias and np.any(ratio > 1):
         sigma = np.where(ratio > 1, (ratio - 1) / 2, 0.0)
+        logger.debug(f"Downsampling by a factor {ratio}: anti-aliasing Gaussian filter with sigma {sigma} voxels applied before interpolation.")
         image = gaussian_filter(image, sigma=sigma, mode="nearest")
 
     # target index i along an axis maps to the fractional index ratio * i + (newOrigin - origin) / spacing
@@ -312,29 +317,36 @@ class Timer:
         def framed(line):
             return f"║{line:<{inner_width}}║"
 
-        print("\n" + "╔" + "═" * inner_width + "╗")
-        print(framed(f"{'Timing Report':^{inner_width}}"))
-        print("╠" + "═" * inner_width + "╣")
+        lines = []
+
+        def emit(line):
+            # printed as before, and collected to write the report to the log file as well
+            print(line)
+            lines.append(line)
+
+        emit("\n" + "╔" + "═" * inner_width + "╗")
+        emit(framed(f"{'Timing Report':^{inner_width}}"))
+        emit("╠" + "═" * inner_width + "╣")
 
         # main thread
         if main_entries:
-            print(framed(" Main Thread"))
-            print(framed(main_header))
-            print(framed(main_sep))
+            emit(framed(" Main Thread"))
+            emit(framed(main_header))
+            emit(framed(main_sep))
             main_thread_name = threading.main_thread().name
             real_total = self.thread_totals.get(main_thread_name, sum(t["total"] for t in main_entries.values()))
             for key, t in sorted(main_entries.items()):
                 row = f"  {key:<{func_width}} {t['total']:>7.4f}s {t['calls']:>5}"
-                print(framed(row))
+                emit(framed(row))
             total_row = f"  {'TOTAL':<{func_width}} {real_total:>8.4f}s"
-            print(framed(total_row))
+            emit(framed(total_row))
 
         # worker threads averaged across all worker threads
         if worker_entries:
-            print("╠" + "═" * inner_width + "╣")
-            print(framed(" Worker Threads (Averaged)"))
-            print(framed(worker_header))
-            print(framed(worker_sep))
+            emit("╠" + "═" * inner_width + "╣")
+            emit(framed(" Worker Threads (Averaged)"))
+            emit(framed(worker_header))
+            emit(framed(worker_sep))
 
             averaged_entries = {}
             for label, entries in worker_entries.items():
@@ -352,11 +364,12 @@ class Timer:
             )
             for label, t in sorted(averaged_entries.items()):
                 row = f"  {label:<{func_width}} {t['total']:>7.4f}s {t['calls']:>5.1f} {t['threads']:>4}"
-                print(framed(row))
+                emit(framed(row))
             total_row = f"  {'TOTAL':<{func_width}} {real_total:>8.4f}s"
-            print(framed(total_row))
+            emit(framed(total_row))
 
-        print("╚" + "═" * inner_width + "╝")
+        emit("╚" + "═" * inner_width + "╝")
+        logger.debug("Timing report:" + "\n".join(lines))
 
     def reset(self):
         """
@@ -573,7 +586,12 @@ def get_partial_volume_mask(
         raise ValueError("gridSize values must be strictly positive.")
 
     planes = _group_polygons_by_z(contour.polygonMesh)
+    roi_name = getattr(contour, "name", None)
+    n_rings = sum(len(polygons) for _, polygons in planes)
+    if n_rings < len(contour.polygonMesh):
+        logger.debug(f"ROI {roi_name}: {len(contour.polygonMesh) - n_rings} of {len(contour.polygonMesh)} contour rings skipped (fewer than 3 points or malformed coordinates).")
     if not planes:
+        logger.debug(f"ROI {roi_name}: no valid contour plane, empty mask returned.")
         return np.zeros(tuple(gridSize.tolist()), dtype=np.float32)
     plane_z = np.array([z for z, _ in planes])
     xy = np.concatenate([polygon for _, polygons in planes for polygon in polygons])
@@ -591,7 +609,10 @@ def get_partial_volume_mask(
     box_start_idx = np.maximum(box_start_idx, 0)
     box_end_idx = np.minimum(box_end_idx, gridSize - 1)
     if np.any(box_end_idx < box_start_idx):
+        logger.debug(f"ROI {roi_name}: the contour lies outside the mask grid, empty mask returned.")
         return np.zeros(tuple(gridSize.tolist()), dtype=np.float32)
+    if np.any(contour_min < origin - spacing / 2.0 - 1e-6) or np.any(contour_max > origin + (gridSize - 0.5) * spacing + 1e-6):
+        logger.debug(f"ROI {roi_name}: the contour extends beyond the mask grid, the mask is cropped to the grid.")
 
     box_grid_size = (box_end_idx - box_start_idx + 1).astype(int)
     box_origin = origin + box_start_idx.astype(float) * spacing
@@ -610,6 +631,10 @@ def get_partial_volume_mask(
                 int(max_high_res_side / max(gx, gy)) if max(gx, gy) > 0 else int(precision),
             ),
         )
+    logger.debug(
+        f"ROI {roi_name}: rasterizing {len(planes)} contour planes (z {plane_z[0]:.2f} to {plane_z[-1]:.2f}) in a {gx}x{gy}x{gz} voxel box "
+        f"starting at voxel {box_start_idx.tolist()}, supersampling precision {adaptive_precision} (requested {precision})."
+    )
 
     # every voxel holds the z-average of the cross-section over its extent: a weighted sum of the nearby rasterized planes
     weights = _plane_weights(box_origin[2] + np.arange(gz) * spacing[2], float(spacing[2]), plane_z, cap_below, cap_above)

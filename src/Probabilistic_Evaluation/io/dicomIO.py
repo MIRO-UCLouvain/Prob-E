@@ -1,4 +1,5 @@
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from typing import List
 
@@ -116,6 +117,7 @@ class DicomReader():
                 else:
                     # target grid covering the same physical (voxel-edge) extent as the original dose grid
                     newGridSize, newOrigin = resampling_grid(key.gridSize, key.spacing, key.origin, self.spacing)
+                    logger.debug(f"Resampling RTDOSE from grid {key.gridSize}, spacing {key.spacing}, origin {key.origin} to grid {newGridSize}, spacing {self.spacing}, origin {newOrigin}.")
                     key.imageArray = resample_image(
                         key.imageArray, key.spacing, key.origin, self.spacing, newGridSize, newOrigin
                     )
@@ -282,6 +284,7 @@ def readDicomHeaders(filePaths, nThreads=-1) -> list:
     """
     if nThreads is None or int(nThreads) < 1:
         nThreads = os.cpu_count() or 1
+    start = time.perf_counter()
     executor = ThreadPoolExecutor(max_workers=int(nThreads))
     futures = [executor.submit(_readDicomHeader, filePath) for filePath in filePaths]
     try:
@@ -291,6 +294,7 @@ def readDicomHeaders(filePaths, nThreads=-1) -> list:
             pending = wait(pending, timeout=0.5).not_done
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
+    logger.debug(f"Read the headers of {len(filePaths)} files with {nThreads} threads in {time.perf_counter() - start:.2f}s.")
     return [future.result() for future in futures]
 
 
@@ -417,12 +421,20 @@ def readDicomDose(filePath) -> DoseImage:
     frameOffsets = getattr(ds, 'GridFrameOffsetVector', None)
     if frameOffsets is not None and len(frameOffsets) > 1:
         zSpacing = abs(float(frameOffsets[1]) - float(frameOffsets[0]))
+        if not np.allclose(np.abs(np.diff(np.asarray(frameOffsets, dtype=float))), zSpacing, rtol=0, atol=1e-3):
+            logger.debug(f"RTDOSE {filePath}: GridFrameOffsetVector {np.asarray(frameOffsets, dtype=float)} is not uniform, the z spacing {zSpacing} is taken from the first two frames.")
     else:
         zSpacing = float(getattr(ds, 'SliceThickness', 1.0))
+        logger.debug(f"RTDOSE {filePath}: no GridFrameOffsetVector with several frames, the z spacing {zSpacing} is taken from SliceThickness (1.0 if absent).")
     spacing = np.array([colSpacing, rowSpacing, zSpacing], dtype=float)
 
     origin = np.asarray(ds.ImagePositionPatient, dtype=float)
     gridSize = np.array(imageArray.shape, dtype=int)
+    logger.debug(
+        f"Read RTDOSE {filePath}: grid {gridSize}, spacing {spacing}, origin {origin}, DoseUnits {getattr(ds, 'DoseUnits', None)}, "
+        f"DoseType {getattr(ds, 'DoseType', None)}, DoseSummationType {getattr(ds, 'DoseSummationType', None)}, "
+        f"DoseGridScaling {getattr(ds, 'DoseGridScaling', 'absent (1.0 used)')}, max dose {np.max(imageArray):.3f}."
+    )
 
     return DoseImage(
         imageArray=imageArray,
@@ -456,12 +468,19 @@ def readDicomStruct(filePath) -> RTStruct:
     for roiContour in getattr(ds, 'ROIContourSequence', []):
         roiNumber = roiContour.ReferencedROINumber
         name = roiNames.get(roiNumber, f'ROI_{roiNumber}')
+        if roiNumber not in roiNames:
+            logger.debug(f"RTSTRUCT {filePath}: ROI number {roiNumber} is not in StructureSetROISequence, it is named {name}.")
         polygonMesh = [
             np.asarray(contourSeq.ContourData, dtype=float)
             for contourSeq in getattr(roiContour, 'ContourSequence', [])
         ]
         contours.append(ROIContour(name=name, polygonMesh=polygonMesh))
 
+    contourNames = {contour.name for contour in contours}
+    logger.debug(
+        f"Read RTSTRUCT {filePath}: {len(contours)} ROI contours, without contour data: {[contour.name for contour in contours if not contour.polygonMesh] or 'none'}, "
+        f"defined but absent from ROIContourSequence: {[name for name in roiNames.values() if name not in contourNames] or 'none'}."
+    )
     return RTStruct(contours=contours, seriesInstanceUID=getattr(ds, 'SeriesInstanceUID', None))
 
 

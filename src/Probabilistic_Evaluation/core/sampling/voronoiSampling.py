@@ -212,6 +212,7 @@ class VoronoiSampling(AbstractsamplingMethod):
         """
         self._voronoiPoints = self._generateVoronoiPoints(bounds, spacing)
         self._voronoiProbabilities = self._generateVoronoiProbabilities(self._voronoiPoints, spacing)
+        logger.debug(f"Sum of the {self._computing_method} probabilities of the {len(self._voronoiPoints)} Voronoi cells: {np.sum(self._voronoiProbabilities):.6f}.")
 
         if self.probabilityMass is not None:
             logger.info(f"Reducing number of scenarios to retain cumulative probability mass: {self.probabilityMass}")
@@ -291,6 +292,11 @@ class VoronoiSampling(AbstractsamplingMethod):
 
         # check what is the number of cells needed to reach the specified cumulative probability mass
         num_cells = np.searchsorted(cumulative_probs, self.probabilityMass, side='right')
+        if cumulative_probs.size and cumulative_probs[-1] < self.probabilityMass:
+            logger.debug(
+                f"The requested probability mass {self.probabilityMass} exceeds the total mass of all {len(cumulative_probs)} Voronoi cells "
+                f"({cumulative_probs[-1]:.6f}): all cells are kept, increase max_displacements to cover more probability mass."
+            )
         # take all the cells with exactly the same probability as the last one to include all cells with the same probability
         while num_cells < len(sorted_probabilities) and sorted_probabilities[num_cells] == sorted_probabilities[num_cells - 1]:
             num_cells += 1

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import os
 import socket
 import subprocess
@@ -33,6 +34,9 @@ _HEARTBEAT_SECONDS = 1
 _STALE_SECONDS = 15
 _BROWSER_GRACE_SECONDS = 180
 _LIVENESS_THREAD = "streamlit-app-liveness"
+
+# The package logger (see logging_utils), looked up by name so that the package itself is not imported.
+logger = logging.getLogger("ProbEval")
 
 
 def require_streamlit(feature: str) -> None:
@@ -124,6 +128,7 @@ def run_streamlit_script(script_path: Path, args: list[str]) -> dict:
         ]
         # no stdin: the server must never wait for keyboard input
         proc = subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL)
+        logger.debug(f"Started the Streamlit server for {script_path.name} (pid {proc.pid}): {' '.join(cmd)}")
         started = time.time()
         try:
             while proc.poll() is None:
@@ -133,11 +138,14 @@ def run_streamlit_script(script_path: Path, args: list[str]) -> dict:
                 except (OSError, ValueError):
                     state = {}
                 if state.get("closed"):
+                    logger.debug(f"{script_path.name}: the page reported that it was closed.")
                     break
                 alive = state.get("alive")
                 if alive is not None and time.time() - alive > _STALE_SECONDS:
+                    logger.debug(f"{script_path.name}: no heartbeat for {_STALE_SECONDS}s, the browser tab was closed.")
                     break  # browser tab closed
                 if alive is None and time.time() - started > _BROWSER_GRACE_SECONDS:
+                    logger.debug(f"{script_path.name}: no browser connected within {_BROWSER_GRACE_SECONDS}s.")
                     break  # browser never connected
         finally:
             if proc.poll() is None:
@@ -145,11 +153,13 @@ def run_streamlit_script(script_path: Path, args: list[str]) -> dict:
                 try:
                     proc.wait(timeout=10)
                 except subprocess.TimeoutExpired:
+                    logger.debug(f"{script_path.name}: the Streamlit server (pid {proc.pid}) did not stop within 10s and is killed.")
                     proc.kill()
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             state = {}
+        logger.debug(f"{script_path.name}: the Streamlit server stopped (exit code {proc.returncode}), final page state {state}.")
         if not state.get("closed") and state.get("alive") is None:
             # the server stopped (or never answered) before a browser connected: say so
             # instead of silently returning as if the user had closed the page

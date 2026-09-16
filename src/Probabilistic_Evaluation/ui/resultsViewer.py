@@ -40,6 +40,7 @@ def _import_launch():
 
 
 _launch = _import_launch()
+logger = _launch.logger
 
 
 # ---------------------------
@@ -70,6 +71,7 @@ def load_results(folder: Path) -> dict:
             print(f"✅ Loaded: {f.name}")
         except Exception as e:
             print(f"❌ Failed: {f.name} -> {e}")
+            logger.debug(f"Could not load the result file {f}.", exc_info=True)
 
     return results
 
@@ -393,12 +395,14 @@ def view_results(folder: str | Path) -> None:
     if not json_files:
         raise FileNotFoundError(f"No *.json result files found in {path}")
 
+    logger.debug(f"Opening the results viewer for {len(json_files)} result files in {path}: {[f.name for f in json_files]}")
     errors: list[Exception] = []
 
     def _run(f: Path) -> None:
         try:
             _launch.run_streamlit_script(Path(__file__), [str(f.resolve())])
         except Exception as e:  # surfaced to the caller once every tab has been dealt with
+            logger.debug(f"The results viewer for {f.name} failed.", exc_info=True)
             errors.append(e)
 
     threads = [threading.Thread(target=_run, args=(f,)) for f in json_files]

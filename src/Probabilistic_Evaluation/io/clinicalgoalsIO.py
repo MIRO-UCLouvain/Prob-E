@@ -105,6 +105,10 @@ class clinicalgoalsreader():
         if all(hasattr(goal, "priority") for goal in goals_list):
             goals_list.sort(key=lambda x: x.priority)
             proba_goals_list.sort(key=lambda x: x.priority)
+        logger.debug(
+            f"Loaded {len(goals_list)} clinical goals from {self.path} ({len(proba_goals_list)} probabilistic), in evaluation order: "
+            + "; ".join(f"{goal.maskName} {goal} (priority {goal.priority}, probabilistic {goal.probabilistic})" for goal in goals_list)
+        )
         
         return goals_list, proba_goals_list
     @log_call(log_result=True)
@@ -114,6 +118,8 @@ class clinicalgoalsreader():
 
             start_time = time.time()
             maskName=goal_dict["ROI"]            
+            if self.maskDict is not None and maskName not in self.maskDict:
+                logger.debug(f"ROI {maskName} of the clinical goal is not among the {len(self.maskDict)} ROIs of maskDict: {list(self.maskDict)}")
             maskPartialVolume = get_partial_volume_mask(
                 contour=self.maskDict[maskName],
                 origin=self._origin,

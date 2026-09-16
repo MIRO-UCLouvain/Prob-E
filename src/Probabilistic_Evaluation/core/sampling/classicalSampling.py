@@ -2,6 +2,7 @@ import numpy as np
 
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
 from Probabilistic_Evaluation.data.uncertaintyModel._abstractUncertaintyModel import AbstractUncertaintyModel
+from Probabilistic_Evaluation.logging_utils import logger
 
 
 class ClassicalSampling(AbstractsamplingMethod):
@@ -36,6 +37,7 @@ class ClassicalSampling(AbstractsamplingMethod):
         N_samples = kwargs.get('N_samples', 1000)
         samples = self.UncertaintyModel.sample(N_samples)
         probs = np.ones(N_samples) / N_samples
+        logger.debug(f"Classical Monte Carlo sampling: {N_samples} samples drawn from {self.UncertaintyModel.name}, each with probability 1/{N_samples}.")
         return samples, probs
 
     def analyticalSampling(self, **kwargs):
@@ -70,4 +72,5 @@ class ClassicalSampling(AbstractsamplingMethod):
         probabilities = np.array(probabilities)
         # Normalize probabilities to sum to 1
         probabilities /= np.sum(probabilities)
+        logger.debug(f"Classical grid sampling: {N_points_per_dim} points per axis within +-{bounds} ({len(points)} points), PDF values normalized to sum to 1.")
         return points, probabilities

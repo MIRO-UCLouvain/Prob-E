@@ -84,6 +84,10 @@ class PatientData:
     def clinicalGoalsList(self, newClinicalGoalsList: list):
         self._clinicalGoalsList = newClinicalGoalsList
         self._probabilisticGoalsList = [goal for goal in newClinicalGoalsList if goal.probabilistic]
+        logger.debug(f"Clinical goals assigned for patientID {self.patientID}: {len(newClinicalGoalsList)} goals, of which {len(self._probabilisticGoalsList)} probabilistic.")
+        missing = list(dict.fromkeys(goal.maskName for goal in newClinicalGoalsList if goal.maskName not in self._maskDict))
+        if missing:
+            logger.debug(f"Clinical goals refer to ROIs that are not in maskDict, evaluating them will fail: {missing}")
 
     @property
     def probabilisticGoalsList(self) -> list:

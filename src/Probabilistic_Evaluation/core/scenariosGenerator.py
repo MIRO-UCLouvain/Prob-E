@@ -1,5 +1,6 @@
 from Probabilistic_Evaluation.data import Scenario
 from Probabilistic_Evaluation.core.sampling._abstractSamplingMethod import AbstractsamplingMethod
+from Probabilistic_Evaluation.logging_utils import logger
 
 
 class ScenariosGenerator:
@@ -36,3 +37,4 @@ class ScenariosGenerator:
         for displacement, probability in zip(displacements, probabilities):
             scenario = Scenario(displacement=displacement, probability=probability)
             self.scenarios_list.append(scenario)
+        logger.debug(f"Generated {len(displacements)} scenarios from {type(self.sampling_method).__name__}.analyticalSampling() with a total probability of {sum(probabilities)}.")
