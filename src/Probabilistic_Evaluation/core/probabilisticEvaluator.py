@@ -8,6 +8,7 @@ from Probabilistic_Evaluation.logging_utils import logger, log_call, GroupedMemo
 import os
 import logging
 import threading
+import time
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
@@ -100,12 +101,21 @@ class ProbabilisticEvaluator:
             if self.sampler.enhanced:
                 self.half_shifted_dose = shift_dose_for_enhanced_sampling(self.blurred_dose)
                 logger.debug(f"Half-shifted blurred dose computed for enhanced sampling for patient {self.patientData.patientID}")
+        else:
+            if self.sampler.enhanced:
+                self.half_shifted_dose = shift_dose_for_enhanced_sampling(self.patientData.doseImage)
+                logger.debug(f"Half-shifted dose computed for enhanced sampling for patient {self.patientData.patientID}")
+            logger.debug("No random setup error parameters in the uncertainty model: scenarios are evaluated on the unblurred dose.")
 
         n_scenarios = len(self.scenarios)
         for goal in self.patientData.clinicalGoalsList:
             # NaN / False until a scenario has actually been evaluated (never uninitialised memory)
             goal.valueList = np.full(n_scenarios, np.nan)
             goal.successList = np.zeros(n_scenarios, dtype=bool)
+
+        roi_names = list(dict.fromkeys(goal.maskName for goal in self.patientData.probabilisticGoalsList))
+        logger.debug(f"Evaluating {len(self.patientData.probabilisticGoalsList)} probabilistic goals on {len(roi_names)} ROIs {roi_names} over {n_scenarios} scenarios with {self.nThreads} threads.")
+        start = time.perf_counter()
 
         file_handler = next((h for h in logger.handlers if isinstance(h, logging.FileHandler)), None)
 
@@ -123,6 +133,7 @@ class ProbabilisticEvaluator:
                 grouped_handler.flush_grouped()
                 logger.removeHandler(grouped_handler)
                 logger.addHandler(file_handler)
+        logger.debug(f"Evaluated {n_scenarios} scenarios in {time.perf_counter() - start:.2f}s.")
 
         passingRates = self.passingRates()
         cumulativePassingRates = self.cumulativePassingRates() if self.computeCumulativePassingRates else None
@@ -182,6 +193,7 @@ class ProbabilisticEvaluator:
         # name the pool thread after the scenario so that the grouped log stays readable per scenario
         threading.current_thread().name = f"Scenario-{scenario_idx+1}"
         logger.info(f"Starting evaluation of scenario {scenario_idx+1}/{len(self.scenarios)}")
+        start = time.perf_counter()
         if self.blurred_dose is not None:
             if np.allclose(scenario.displacement % 1, 0, atol=1e-6):
                 scenario.compute_shifted_image(self.blurred_dose, scenario.displacement)
@@ -190,10 +202,17 @@ class ProbabilisticEvaluator:
                 shift = np.array(scenario.displacement) - 0.5
                 scenario.compute_shifted_image(self.half_shifted_dose, shift)
                 logger.debug(f"{scenario.displacement}: Using half-shifted blurred dose for evaluation, with corrected shift: {shift}")
-        
+            
         # Fractionation is not considered, we use the original dose image for evaluation
         else:
-            scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
+            if np.allclose(scenario.displacement % 1, 0, atol=1e-6):
+                scenario.compute_shifted_image(self.patientData.doseImage, scenario.displacement)
+                logger.debug(f"{scenario.displacement}: Using original dose for evaluation")
+            elif self.half_shifted_dose is not None:
+                shift = np.array(scenario.displacement) - 0.5
+                scenario.compute_shifted_image(self.half_shifted_dose, shift)
+                logger.debug(f"{scenario.displacement}: Using half shifted dose for evaluation, with corrected shift: {shift}")
+            
 
         dvh_dict = {}
         # only the ROIs of the probabilistic goals are needed here, not every mask in patientData
@@ -211,6 +230,11 @@ class ProbabilisticEvaluator:
                 if self.computeVWMax:
                     self.VWMax = np.maximum(self.VWMax, scenario.doseImage)
         scenario.delete_doseImage()
+        failed = [f"{goal.maskName} {goal} ({goal.valueList[scenario_idx]:.4f})" for goal in self.patientData.probabilisticGoalsList if not goal.successList[scenario_idx]]
+        logger.debug(
+            f"Scenario {scenario_idx+1}/{len(self.scenarios)} evaluated in {time.perf_counter() - start:.2f}s: "
+            f"{len(self.patientData.probabilisticGoalsList) - len(failed)}/{len(self.patientData.probabilisticGoalsList)} probabilistic goals passed, failed: {'; '.join(failed) or 'none'}."
+        )
 
     @log_call(log_result=True)
     def computeNominalValues(self):
@@ -246,6 +270,8 @@ class ProbabilisticEvaluator:
 
         # We can use the nominal index to directly get the values from the goal's valueList
         else:
+            if self.nominal_index is None:
+                logger.debug("No zero-displacement scenario: the nominal values of the probabilistic goals are reported as N/A.")
             for maskname in dict.fromkeys(goal.maskName for goal in self.patientData.clinicalGoalsList):
 
                 dvh_dict[maskname] = DVH(dosemap=nominal_dose, mask=self.patientData.maskDict[maskname], spacing=self.patientData.spacing)
@@ -389,6 +415,7 @@ class ProbabilisticEvaluator:
                 }
 
             rows.append(row)
+            logger.debug("Passing rate table row: " + ", ".join(f"{key}: {value}" for key, value in row.items() if key != "Success Array"))
 
         table = pd.DataFrame(rows, columns=headers)
         return table
@@ -459,6 +486,10 @@ class ProbabilisticEvaluator:
         print(f"Blurring dose map with sigma_x={sigma_x}, sigma_y={sigma_y}, sigma_z={sigma_z}")
         print(f"Voxel spacing: {self.patientData.spacing}")
         blurred_dosemap = sp.ndimage.gaussian_filter(dosemap, sigma=[sigma_x, sigma_y, sigma_z] / self.patientData.spacing)
+        logger.debug(
+            f"Dose blurred with sigma {np.array([sigma_x, sigma_y, sigma_z])} mm, i.e. {[sigma_x, sigma_y, sigma_z] / self.patientData.spacing} voxels; "
+            f"max dose {np.max(dosemap):.3f} before and {np.max(blurred_dosemap):.3f} after blurring."
+        )
         return blurred_dosemap
     
     
