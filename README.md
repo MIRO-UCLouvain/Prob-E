@@ -10,7 +10,7 @@ trade-offs between organ-at-risk sparing and target coverage under uncertainty.
 ## Installation
 
 ```bash
-pip install Prob-E
+pip install RT-Prob-E
 ```
 
 ### Optional: Streamlit-based UI tools
@@ -22,7 +22,7 @@ and are available as an optional extra, since they depend on
 tables):
 
 ```bash
-pip install Prob-E[ui]
+pip install RT-Prob-E[ui]
 ```
 
 **Clinical goals editor** — add, copy, delete and edit the goals in a
